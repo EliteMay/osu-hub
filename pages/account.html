@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="osu!の公開プロフィールとRecent Scoresを取得してosu! Hubへ保存するAccount Sync設定。">
+  <meta name="description" content="osu! API v2の公開プロフィールとRecent Scoresを取得してosu! Hubへ保存するAccount Sync設定。">
   <title>Account Sync | osu! Hub</title>
   <link rel="stylesheet" href="../css/styles.css">
 </head>
@@ -24,9 +24,9 @@
 <main class="container">
   <section class="page-head">
     <div>
-      <p class="eyebrow">osu! public sync</p>
+      <p class="eyebrow">osu! api sync</p>
       <h1>Account Sync</h1>
-      <p class="lead">Cloudflare Worker経由でosu!の公開プロフィールと最近のプレイを取得し、Resultsへ自動保存する。osu! OAuthのClient ID / Secretは不要です。</p>
+      <p class="lead">Cloudflare Worker経由でosu! API v2の公開プロフィールと最近のプレイを取得し、Resultsへ自動保存する。ブラウザへosu! Client ID / Client Secretを入力する必要はありません。</p>
     </div>
   </section>
 
@@ -94,7 +94,7 @@
         </div>
       </section>
       <section class="panel flat">
-        <div class="notice"><strong>osu!のSecretは不要</strong><br>Account Syncは公開プロフィール情報だけを取得します。osu! Client ID / Client SecretをこのサイトやWorkerへ登録する必要はありません。</div>
+        <div class="notice"><strong>ブラウザへのosu! Secret入力は不要</strong><br>同期用の短期Access TokenはGitHub Actionsで自動更新し、Cloudflare WorkerにはAccess Tokenだけを保存します。Client SecretをこのWeb画面へ入力・保存することはありません。</div>
       </section>
     </aside>
   </div>
@@ -105,7 +105,7 @@
   </section>
 </main>
 
-<footer class="footer"><span>osu! Hub <strong data-site-version></strong></span><span>Public osu! data only. No osu! OAuth secret required.</span></footer>
+<footer class="footer"><span>osu! Hub <strong data-site-version></strong></span><span>Public osu! data via API v2. Browser secrets are not required.</span></footer>
 <script src="../js/storage.js"></script>
 <script src="../js/osu-sync.js"></script>
 <script src="../js/site-meta.js"></script>

@@ -77,17 +77,14 @@ jobs:
             const fs = require("fs");
             const value = JSON.parse(fs.readFileSync(0, "utf8"));
             if (value?.ok !== true) throw new Error("Worker health returned ok=false");
-            if (value?.configured !== true) throw new Error("Worker is not configured");
+            if (value?.configured !== true) throw new Error("Worker pre-issued token is not configured");
             if (value?.service !== "osu-hub-api") throw new Error("Unexpected Worker service response");
-            if (value?.upstreamMode !== "public-web") throw new Error("Worker is not using public-web upstream mode");
-            if (value?.oauthRequired !== false) throw new Error("Worker unexpectedly requires osu! OAuth");
+            if (value?.upstreamMode !== "api-v2-preissued-token") throw new Error("Worker is not using the pre-issued-token API v2 mode");
+            if (value?.browserOAuthRequired !== false) throw new Error("Browser must not require osu! OAuth credentials");
+            if (value?.tokenManagedBy !== "github-actions") throw new Error("Unexpected token management mode");
             console.log("Worker health check: OK");
           '
 
-          # Public user ID 2 is used only as a lightweight end-to-end route probe.
-          # A zero-length recent-score list is valid; the smoke test verifies that
-          # profile resolution and the public Recent Scores route both return the
-          # expected osu! Hub response shape without OAuth.
           sync="$(curl --fail --silent --show-error \
             --retry 2 --retry-delay 2 --retry-all-errors \
             --connect-timeout 10 --max-time 30 \
@@ -97,8 +94,8 @@ jobs:
             const fs = require("fs");
             const value = JSON.parse(fs.readFileSync(0, "utf8"));
             if (value?.apiVersion !== 1) throw new Error("Unexpected sync apiVersion");
-            if (value?.upstreamMode !== "public-web") throw new Error("Sync did not use public-web upstream mode");
-            if (!value?.user || Number(value.user.id) !== 2) throw new Error("Public profile resolution smoke test failed");
+            if (value?.upstreamMode !== "api-v2-preissued-token") throw new Error("Sync did not use pre-issued-token API v2 mode");
+            if (!value?.user || Number(value.user.id) !== 2) throw new Error("API v2 user resolution smoke test failed");
             if (!Array.isArray(value.scores)) throw new Error("Recent Scores response is not an array");
             if (value.scores.length > 1) throw new Error("Recent Scores smoke limit was not respected");
             for (const score of value.scores) {
@@ -112,8 +109,9 @@ jobs:
             echo
             echo "- URL: ${base_url}"
             echo "- /health: OK"
-            echo "- /api/sync public route smoke test: OK"
-            echo "- osu! upstream: public profile web endpoints"
-            echo "- osu! OAuth: not required"
+            echo "- /api/sync end-to-end smoke test: OK"
+            echo "- osu! upstream: API v2 with pre-issued Bearer token"
+            echo "- Browser OAuth credentials: not required"
+            echo "- Token manager: GitHub Actions"
             echo "- Trigger: ${GITHUB_EVENT_NAME}"
           } >> "$GITHUB_STEP_SUMMARY"

@@ -1,24 +1,41 @@
 # osu! Hub API Worker
 
-GitHub Pagesからosu!の公開プロフィール・Recent ScoresへアクセスするためのCloudflare Workerです。
+GitHub Pagesからosu! API v2の公開ユーザー情報・Recent ScoresへアクセスするためのCloudflare Workerです。
+
+## 現行構成
+
+```text
+GitHub Actions
+  └─ Client ID / Client Secret
+      ↓ /oauth/token
+  short-lived Access Token
+      ↓ Cloudflare Worker Secret: OSU_ACCESS_TOKEN
+Cloudflare Worker
+      ↓ Authorization: Bearer <token>
+osu! API v2
+```
+
+ブラウザとCloudflare Workerは `OSU_CLIENT_ID` / `OSU_CLIENT_SECRET` を保持しません。Client CredentialsはGitHub Repository Actions Secretsだけに保存し、Workerには短期Access Tokenだけを渡します。
+
+## なぜこの構成か
+
+旧方式ではCloudflare Worker自身からosu!へ接続していましたが、実運用で次の両方が429になりました。
+
+- Worker → `/oauth/token`
+- OAuthを避けたWorker → 公開プロフィール / Recent Scores Web Route
+
+そのためCloudflareの共有送信元からToken発行を行わず、GitHub Actions runnerでClient Credentials Tokenを発行してからWorkerへ渡します。
+
+osu!のClient Credentials Tokenは24時間の有効期間を返すため、`Refresh osu API Token` Workflowは12時間ごとに更新します。更新時はTokenをログへ出さずmaskし、osu! API v2で実認証してからCloudflare Secretへ保存します。
 
 ## 役割
 
-- osu!の公開プロフィールページからユーザー情報・Statisticsを取得する
-- osu!公式Webが利用する公開Recent Scores経路から1〜100件を取得する
-- osu! Hubで扱いやすいJSONへ正規化する
-- 同一同期条件を60秒キャッシュし、上流への過剰アクセスを避ける
-- ブラウザからのアクセス元を`ALLOWED_ORIGINS`で制限する
-
-Account Syncではosu! OAuth Client Credentialsを使用しません。`OSU_CLIENT_ID` / `OSU_CLIENT_SECRET`は不要です。
-
-## なぜOAuthを使わないか
-
-Cloudflare Workerから`/oauth/token`へClient Credentials Tokenを取得する構成では、Cloudflare側の共有送信元とosu!側のToken Endpoint Rate Limitの組み合わせにより429が継続する場合がありました。
-
-現在はosu!の公開プロフィール画面と、osu!公式Web自身が利用する公開Recent Scores経路を利用します。Client Secretを扱わずに済み、Token EndpointのRate Limitにも依存しません。
-
-この経路は公開Web実装への依存があるため、osu!側のHTML属性・Web Route仕様が変更された場合はWorker側の追従が必要です。Response Validationと明示的なError処理を維持します。
+- osu! API v2 `Get User` で公開プロフィール・Statisticsを取得
+- `Get User Scores / recent` でRecent Scoresを1〜100件取得
+- osu! Hub用JSONへ正規化
+- 同一同期条件を60秒キャッシュ
+- upstream 401 / 429 / timeout / 不正Responseを明示Error化
+- `ALLOWED_ORIGINS`でブラウザOriginを制限
 
 ## エンドポイント
 
@@ -32,71 +49,78 @@ Cloudflare Workerから`/oauth/token`へClient Credentials Tokenを取得する�
   "service": "osu-hub-api",
   "apiVersion": 1,
   "configured": true,
-  "upstreamMode": "public-web",
-  "oauthRequired": false
+  "upstreamMode": "api-v2-preissued-token",
+  "browserOAuthRequired": false,
+  "tokenManagedBy": "github-actions"
 }
 ```
 
-### `GET /api/sync`
+`configured=false` は `OSU_ACCESS_TOKEN` がWorker Secretへ入っていない状態です。
 
-例:
+### `GET /api/sync`
 
 ```text
 /api/sync?user=12345678&mode=osu&limit=100&include_fails=1
 ```
-
-パラメータ:
 
 - `user`: osu! User ID またはユーザー名
 - `mode`: `osu`, `taiko`, `fruits`, `mania`
 - `limit`: 1〜100
 - `include_fails`: `1`でFailも含める
 
-## GitHub Actionsから本番deploy
+## GitHub Actions Secrets
 
-`.github/workflows/deploy-worker.yml` は手動実行に加え、mainの `cloudflare/worker/**` またはWorkflow自身を変更したときに自動deployします。
-
-GitHub Repository SettingsのActions Secretsで必要なのは次の2つです。
+Repository SettingsのActions Secretsで次を管理します。
 
 ```text
 CLOUDFLARE_ACCOUNT_ID
 CLOUDFLARE_API_TOKEN
+OSU_CLIENT_ID
+OSU_CLIENT_SECRET
 ```
 
-Workflowは:
+用途は分離します。
 
-1. Cloudflare Secretの存在確認
-2. `cloudflare/wrangler-action@v4` でdeploy
-3. deploy先 `/health` を確認
-4. `upstreamMode: public-web` / `oauthRequired: false` を検証
-5. GitHub Actions SummaryへWorker URLを表示
+- `CLOUDFLARE_*`: Worker deploy / Secret更新
+- `OSU_CLIENT_ID` / `OSU_CLIENT_SECRET`: GitHub Actions runner上でTokenを発行する時だけ利用
+- `OSU_ACCESS_TOKEN`: GitHubへ保存せず、実行時に生成してCloudflare Worker Secretへ送る
 
-までを行います。
+Client SecretをCloudflare Worker Secretへ保存しません。
 
-以前設定した `OSU_CLIENT_ID` / `OSU_CLIENT_SECRET` がGitHub / Cloudflare側に残っていても、現行Workerは参照しません。
+## Workflow
 
-## 手動deploy fallback
+### `Deploy osu Hub API Worker`
 
-GitHub Actionsを使わない場合はローカルから実行できます。
+mainの `cloudflare/worker/**` またはdeploy Workflow変更時に実行します。
 
-```bash
-cd cloudflare/worker
-npm install
-npx wrangler login
-npm run deploy
-```
+1. Workerをdeploy
+2. `/health`で新しいupstream modeとToken設定を確認
+3. 公開User ID 2で `/api/sync` を1件だけ実行
+4. Worker → osu! API v2までのend-to-end成功を確認
 
-osu!のSecret設定は不要です。
+### `Refresh osu API Token`
 
-デプロイ後に表示されたWorker URLをosu! Hubの`Account Sync`ページへ入力します。
+手動実行、Workflow変更時、12時間ごとのscheduleで実行します。
 
-```text
-https://osu-hub-api.<subdomain>.workers.dev
-```
+1. GitHub Actions Secretsを確認
+2. GitHub Actions runnerから `/oauth/token` へClient Credentials Request
+3. Access Tokenをmask
+4. GitHub Actions runnerからosu! API v2 `Get User`でTokenを確認
+5. `OSU_ACCESS_TOKEN`だけをCloudflare Worker Secretへ保存
+6. Workerをredeploy
+7. `/health` と `/api/sync` を再確認
 
-本番URLは `data/site.json` の `osuApi.workerUrl` を正本としてGitHub Pages側の既定値にします。
+Token更新に失敗した場合は新しい値で上書きしません。既存Tokenが有効な間はWorkerを利用できますが、24時間を超えて更新できない場合はWorkerが401を検知し、利用者には同期Tokenエラーとして返します。Local Results等は削除しません。
 
 ## ローカル開発
+
+`.dev.vars.example` を参考に、Git管理対象外の `.dev.vars` へ一時Access Tokenを設定します。
+
+```text
+OSU_ACCESS_TOKEN=<short-lived access token>
+```
+
+Client ID / Client SecretをWorker Runtimeへ置く必要はありません。
 
 ```bash
 cd cloudflare/worker
@@ -104,10 +128,10 @@ npm install
 npm run dev
 ```
 
-`ALLOWED_ORIGINS`は `wrangler.toml` で管理します。秘密情報は不要です。
+## Security / Privacy
 
-## 公開範囲 / 注意
-
-Workerは公開プロフィール・公開スコアのみを取得します。osu!アカウントへのログイン操作やプレイ操作は行いません。
-
-公開Web経路はosu!api v2の正式なOAuth API Endpointとは異なり、osu! Web実装変更の影響を受けます。そのため、取得失敗時に無理なFallbackやScraping範囲拡大を行わず、Errorとして利用者へ返して保守時に追従します。
+- 実Access Token / Client SecretをGitへcommitしない
+- Access Tokenをログへ表示しない
+- Workerは任意URLを中継するProxyにしない
+- 取得対象はosu!の公開プロフィール・公開スコアだけ
+- 個人のResults保存先はBrowser IndexedDBで、GitHubへ自動送信しない
