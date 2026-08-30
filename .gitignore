@@ -17,11 +17,16 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Local external tools
+# Downloaded external audio tools
 tools/nircmd.exe
 tools/nircmdc.exe
 tools/svcl.exe
 tools/*.zip
+tools/*.chm
+tools/_nircmd_download/
+tools/nircmd_package/
+tools/NirCmd_source_notice.txt
+tools/readme.txt
 
 # OS / editor
 .DS_Store
