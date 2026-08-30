@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "project": "osu! Hub",
+  "guideVersion": "1.1.1",
+  "profiles": [
+    "STATIC",
+    "DATA",
+    "AI-HANDOFF",
+    "CLOUD",
+    "ELECTRON",
+    "TOOL"
+  ],
+  "sourcesOfTruth": {
+    "webVersion": "data/site.json#siteVersion",
+    "webStorageSchema": "js/storage.js#SCHEMA_VERSION",
+    "desktopVersion": "package.json#version",
+    "desktopUpdateMetadata": "version.json"
+  }
+}
