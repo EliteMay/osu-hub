@@ -3,6 +3,16 @@
     return location.pathname.includes('/pages/') ? '../data/site.json' : './data/site.json';
   }
 
+  async function hasSavedWorker() {
+    try {
+      if (!window.OsuDB) return false;
+      const saved = await window.OsuDB.get('settings', 'osuAccount');
+      return Boolean(String(saved?.workerUrl || '').trim());
+    } catch {
+      return false;
+    }
+  }
+
   async function loadSiteMeta() {
     try {
       const response = await fetch(siteJsonPath(), { cache: 'no-store' });
@@ -16,7 +26,7 @@
         document.documentElement.dataset.siteVersion = version;
       }
 
-      const workerReady = Boolean(String(site?.osuApi?.workerUrl || '').trim());
+      const workerReady = Boolean(String(site?.osuApi?.workerUrl || '').trim()) || await hasSavedWorker();
       document.querySelectorAll('[data-account-sync-badge]').forEach((el) => {
         el.textContent = workerReady ? 'READY' : 'SETUP REQUIRED';
       });
