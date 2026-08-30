@@ -1,13 +1,9 @@
-let tokenCache = { accessToken: '', expiresAt: 0 };
-let tokenRefreshPromise = null;
-
 const API_VERSION = 1;
-const OSU_API_VERSION = '20220705';
 const RULESETS = new Set(['osu', 'taiko', 'fruits', 'mania']);
 const UPSTREAM_TIMEOUT_MS = 12000;
-const TOKEN_REFRESH_SKEW_MS = 60_000;
-const TOKEN_CACHE_KEY = 'https://osu-hub-cache.internal/oauth-token-v1';
 const SYNC_CACHE_TTL_SECONDS = 60;
+const OSU_ORIGIN = 'https://osu.ppy.sh';
+const USER_AGENT = 'osu-hub/0.2.4 (+https://github.com/EliteMay/osu-hub)';
 
 function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data, null, 2), {
@@ -62,50 +58,6 @@ function cacheAvailable() {
   return typeof caches !== 'undefined' && caches?.default;
 }
 
-function tokenIsUsable(value, now = Date.now()) {
-  return Boolean(value?.accessToken) && Number(value?.expiresAt) > now + TOKEN_REFRESH_SKEW_MS;
-}
-
-async function readSharedTokenCache() {
-  if (!cacheAvailable()) return null;
-  try {
-    const response = await caches.default.match(new Request(TOKEN_CACHE_KEY));
-    if (!response) return null;
-    const value = await response.json().catch(() => null);
-    return tokenIsUsable(value) ? value : null;
-  } catch {
-    return null;
-  }
-}
-
-async function writeSharedTokenCache(value) {
-  if (!cacheAvailable() || !tokenIsUsable(value, Date.now() - TOKEN_REFRESH_SKEW_MS)) return;
-  const ttlSeconds = Math.max(60, Math.floor((Number(value.expiresAt) - Date.now()) / 1000));
-  try {
-    await caches.default.put(
-      new Request(TOKEN_CACHE_KEY),
-      new Response(JSON.stringify(value), {
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Cache-Control': `max-age=${ttlSeconds}`,
-        },
-      }),
-    );
-  } catch {
-    // Shared cache is an optimization. In-memory cache still works if Cache API is unavailable.
-  }
-}
-
-async function clearAccessTokenCache() {
-  tokenCache = { accessToken: '', expiresAt: 0 };
-  if (!cacheAvailable()) return;
-  try {
-    await caches.default.delete(new Request(TOKEN_CACHE_KEY));
-  } catch {
-    // Ignore cache cleanup errors and continue with a fresh OAuth request.
-  }
-}
-
 async function fetchWithTimeout(url, options = {}, timeoutMs = UPSTREAM_TIMEOUT_MS) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -113,11 +65,11 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = UPSTREAM_TIMEOUT_
     return await fetch(url, { ...options, signal: controller.signal });
   } catch (error) {
     if (error?.name === 'AbortError') {
-      const timeoutError = new Error('osu! APIへの接続がタイムアウトしました。');
+      const timeoutError = new Error('osu!への接続がタイムアウトしました。');
       timeoutError.status = 504;
       throw timeoutError;
     }
-    const networkError = new Error('osu! APIへ接続できませんでした。');
+    const networkError = new Error('osu!へ接続できませんでした。');
     networkError.status = 502;
     throw networkError;
   } finally {
@@ -125,109 +77,77 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = UPSTREAM_TIMEOUT_
   }
 }
 
-async function requestAccessToken(env) {
-  const body = new URLSearchParams({
-    client_id: String(env.OSU_CLIENT_ID),
-    client_secret: String(env.OSU_CLIENT_SECRET),
-    grant_type: 'client_credentials',
-    scope: 'public',
-  });
-
-  const response = await fetchWithTimeout('https://osu.ppy.sh/oauth/token', {
-    method: 'POST',
+async function osuPublicResponse(path, accept = 'application/json') {
+  const response = await fetchWithTimeout(`${OSU_ORIGIN}${path}`, {
     headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: accept,
+      'User-Agent': USER_AGENT,
     },
-    body,
+    redirect: 'follow',
   });
 
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok || !payload.access_token) {
-    const retryAfter = response.headers.get('Retry-After');
-    if (response.status === 429) {
-      const waitText = retryAfter && /^\d+$/.test(retryAfter)
-        ? `${retryAfter}秒ほど待ってから再試行してください。`
-        : '少し待ってから再試行してください。';
-      const error = new Error(`osu! OAuthのレート制限に達しました。${waitText}`);
-      error.status = 429;
-      error.retryAfter = retryAfter || '';
-      throw error;
-    }
-    const detail = safeText(payload?.error_description || payload?.message || payload?.error || '', 160);
-    const error = new Error(detail
-      ? `osu! OAuth認証に失敗しました (${response.status}): ${detail}`
-      : `osu! OAuth認証に失敗しました (${response.status})`);
+  if (response.ok) return response;
+
+  const retryAfter = response.headers.get('Retry-After') || '';
+  if (response.status === 429) {
+    const error = new Error('osu!側のアクセス制限に達しました。少し待ってから再試行してください。');
+    error.status = 429;
+    error.retryAfter = retryAfter;
+    throw error;
+  }
+  if (response.status === 404) {
+    const error = new Error('osu!ユーザーまたは公開データが見つかりませんでした。');
+    error.status = 404;
+    throw error;
+  }
+
+  const error = new Error(`osu!公開データの取得に失敗しました (${response.status})`);
+  error.status = response.status >= 500 ? 502 : response.status;
+  error.retryAfter = retryAfter;
+  throw error;
+}
+
+async function osuPublicJson(path) {
+  const response = await osuPublicResponse(path, 'application/json');
+  const payload = await response.json().catch(() => null);
+  if (payload == null) {
+    const error = new Error('osu!公開データの応答形式が正しくありません。');
+    error.status = 502;
+    throw error;
+  }
+  return payload;
+}
+
+async function fetchPublicProfile(userInput, ruleset) {
+  const response = await osuPublicResponse(`/users/${encodeURIComponent(userInput)}/${ruleset}`, 'text/html');
+  let initialDataText = '';
+
+  if (typeof HTMLRewriter === 'undefined') {
+    const error = new Error('Worker RuntimeがHTMLRewriterに対応していません。');
+    error.status = 500;
+    throw error;
+  }
+
+  const rewriter = new HTMLRewriter().on('[data-react="profile-page"]', {
+    element(element) {
+      if (!initialDataText) initialDataText = element.getAttribute('data-initial-data') || '';
+    },
+  });
+
+  await rewriter.transform(response).text();
+  if (!initialDataText) {
+    const error = new Error('osu!プロフィール情報を読み取れませんでした。');
     error.status = 502;
     throw error;
   }
 
-  const expiresIn = Math.max(60, Number(payload.expires_in || 3600));
-  const value = {
-    accessToken: String(payload.access_token),
-    expiresAt: Date.now() + expiresIn * 1000,
-  };
-  tokenCache = value;
-  await writeSharedTokenCache(value);
-  return value.accessToken;
-}
-
-async function getAccessToken(env, forceRefresh = false) {
-  if (!env.OSU_CLIENT_ID || !env.OSU_CLIENT_SECRET) {
-    const error = new Error('Cloudflare WorkerにOSU_CLIENT_ID / OSU_CLIENT_SECRETが設定されていません。');
-    error.status = 503;
+  const initialData = JSON.parse(initialDataText);
+  if (!initialData?.user) {
+    const error = new Error('osu!プロフィール情報の形式が正しくありません。');
+    error.status = 502;
     throw error;
   }
-
-  if (forceRefresh) await clearAccessTokenCache();
-
-  if (!forceRefresh && tokenIsUsable(tokenCache)) {
-    return tokenCache.accessToken;
-  }
-
-  if (!forceRefresh) {
-    const shared = await readSharedTokenCache();
-    if (shared) {
-      tokenCache = shared;
-      return shared.accessToken;
-    }
-  }
-
-  if (tokenRefreshPromise) return tokenRefreshPromise;
-
-  tokenRefreshPromise = requestAccessToken(env);
-  try {
-    return await tokenRefreshPromise;
-  } finally {
-    tokenRefreshPromise = null;
-  }
-}
-
-async function osuFetch(env, path, retry = true) {
-  const token = await getAccessToken(env);
-  const response = await fetchWithTimeout(`https://osu.ppy.sh${path}`, {
-    headers: {
-      Accept: 'application/json',
-      Authorization: `Bearer ${token}`,
-      'x-api-version': OSU_API_VERSION,
-    },
-  });
-
-  if (response.status === 401 && retry) {
-    await clearAccessTokenCache();
-    await getAccessToken(env, true);
-    return osuFetch(env, path, false);
-  }
-
-  const payload = await response.json().catch(() => null);
-  if (!response.ok) {
-    const message = payload?.error || payload?.message || `osu! API request failed (${response.status})`;
-    const error = new Error(message);
-    error.status = response.status === 404 ? 404 : (response.status === 429 ? 429 : 502);
-    error.retryAfter = response.headers.get('Retry-After') || '';
-    throw error;
-  }
-  return payload;
+  return initialData.user;
 }
 
 function modAcronyms(mods) {
@@ -253,7 +173,7 @@ function normalizeScore(score) {
   const mapName = `${artist} - ${title} [${difficulty}]`.slice(0, 500);
   const endedAt = score?.ended_at || score?.created_at || null;
   const scoreId = String(score?.id ?? '').trim();
-  if (!/^\d+$/.test(scoreId)) throw new Error('osu! APIから不正なScore IDが返されました。');
+  if (!/^\d+$/.test(scoreId)) throw new Error('osu!から不正なScore IDが返されました。');
 
   return {
     id: `osu:${scoreId}`,
@@ -290,7 +210,7 @@ function normalizeScore(score) {
 
 function normalizeUser(user, ruleset) {
   if (!user || !Number.isFinite(Number(user.id)) || !String(user.username || '').trim()) {
-    throw new Error('osu! APIから不正なユーザー情報が返されました。');
+    throw new Error('osu!から不正なユーザー情報が返されました。');
   }
   const stats = user.statistics || {};
   return {
@@ -308,33 +228,34 @@ function normalizeUser(user, ruleset) {
   };
 }
 
-async function handleSync(url, env) {
+async function handleSync(url) {
   const userInput = cleanUser(url.searchParams.get('user'));
   const ruleset = String(url.searchParams.get('mode') || 'osu');
   if (!RULESETS.has(ruleset)) throw new Error('未対応のrulesetです。');
 
   const limit = clampInt(url.searchParams.get('limit'), 1, 100, 100);
   const includeFails = url.searchParams.get('include_fails') !== '0';
-  const key = /^\d+$/.test(userInput) ? 'id' : 'username';
-  const user = await osuFetch(env, `/api/v2/users/${encodeURIComponent(userInput)}/${ruleset}?key=${key}`);
+  const profile = await fetchPublicProfile(userInput, ruleset);
+  const user = normalizeUser(profile, ruleset);
+
   const params = new URLSearchParams({
-    legacy_only: '0',
     include_fails: includeFails ? '1' : '0',
     mode: ruleset,
     limit: String(limit),
     offset: '0',
   });
-  const scores = await osuFetch(env, `/api/v2/users/${user.id}/scores/recent?${params}`);
+  const scores = await osuPublicJson(`/users/${user.id}/scores/recent?${params}`);
   if (!Array.isArray(scores)) {
-    const error = new Error('osu! APIのRecent Scores応答形式が正しくありません。');
+    const error = new Error('osu!のRecent Scores応答形式が正しくありません。');
     error.status = 502;
     throw error;
   }
 
   return {
     apiVersion: API_VERSION,
+    upstreamMode: 'public-web',
     syncedAt: new Date().toISOString(),
-    user: normalizeUser(user, ruleset),
+    user,
     scores: scores.slice(0, limit).map(normalizeScore),
   };
 }
@@ -342,21 +263,21 @@ async function handleSync(url, env) {
 function syncCacheRequest(url) {
   const params = new URLSearchParams(url.searchParams);
   params.sort();
-  return new Request(`https://osu-hub-cache.internal/sync-v1?${params.toString()}`);
+  return new Request(`https://osu-hub-cache.internal/sync-v2?${params.toString()}`);
 }
 
-async function handleSyncWithCache(url, env) {
+async function handleSyncWithCache(url) {
   const key = syncCacheRequest(url);
   if (cacheAvailable()) {
     try {
       const cached = await caches.default.match(key);
       if (cached) return await cached.json();
     } catch {
-      // Cache is an optimization; fall through to osu! API when unavailable.
+      // Cache is an optimization; fall through to osu! when unavailable.
     }
   }
 
-  const payload = await handleSync(url, env);
+  const payload = await handleSync(url);
   if (cacheAvailable()) {
     try {
       await caches.default.put(key, new Response(JSON.stringify(payload), {
@@ -391,12 +312,14 @@ export default {
           ok: true,
           service: 'osu-hub-api',
           apiVersion: API_VERSION,
-          configured: Boolean(env.OSU_CLIENT_ID && env.OSU_CLIENT_SECRET),
+          configured: true,
+          upstreamMode: 'public-web',
+          oauthRequired: false,
         }, 200, cors || {});
       }
 
       if (url.pathname === '/api/sync') {
-        const payload = await handleSyncWithCache(url, env);
+        const payload = await handleSyncWithCache(url);
         return json(payload, 200, cors || {});
       }
 
