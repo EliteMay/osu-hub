@@ -3,6 +3,7 @@ let tokenCache = { accessToken: '', expiresAt: 0 };
 const API_VERSION = 1;
 const OSU_API_VERSION = '20220705';
 const RULESETS = new Set(['osu', 'taiko', 'fruits', 'mania']);
+const UPSTREAM_TIMEOUT_MS = 12000;
 
 function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data, null, 2), {
@@ -49,6 +50,29 @@ function cleanUser(value) {
   return user;
 }
 
+function safeText(value, max = 300) {
+  return String(value ?? '').slice(0, max);
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = UPSTREAM_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      const timeoutError = new Error('osu! APIへの接続がタイムアウトしました。');
+      timeoutError.status = 504;
+      throw timeoutError;
+    }
+    const networkError = new Error('osu! APIへ接続できませんでした。');
+    networkError.status = 502;
+    throw networkError;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function getAccessToken(env, forceRefresh = false) {
   if (!env.OSU_CLIENT_ID || !env.OSU_CLIENT_SECRET) {
     const error = new Error('Cloudflare WorkerにOSU_CLIENT_ID / OSU_CLIENT_SECRETが設定されていません。');
@@ -68,7 +92,7 @@ async function getAccessToken(env, forceRefresh = false) {
     scope: 'public',
   });
 
-  const response = await fetch('https://osu.ppy.sh/oauth/token', {
+  const response = await fetchWithTimeout('https://osu.ppy.sh/oauth/token', {
     method: 'POST',
     headers: {
       Accept: 'application/json',
@@ -93,7 +117,7 @@ async function getAccessToken(env, forceRefresh = false) {
 
 async function osuFetch(env, path, retry = true) {
   const token = await getAccessToken(env);
-  const response = await fetch(`https://osu.ppy.sh${path}`, {
+  const response = await fetchWithTimeout(`https://osu.ppy.sh${path}`, {
     headers: {
       Accept: 'application/json',
       Authorization: `Bearer ${token}`,
@@ -102,6 +126,7 @@ async function osuFetch(env, path, retry = true) {
   });
 
   if (response.status === 401 && retry) {
+    tokenCache = { accessToken: '', expiresAt: 0 };
     await getAccessToken(env, true);
     return osuFetch(env, path, false);
   }
@@ -120,8 +145,9 @@ function modAcronyms(mods) {
   if (!Array.isArray(mods) || mods.length === 0) return 'NM';
   const values = mods
     .map((mod) => (typeof mod === 'string' ? mod : mod?.acronym))
-    .filter(Boolean);
-  return values.length ? values.join('') : 'NM';
+    .filter(Boolean)
+    .map((value) => safeText(value, 8));
+  return values.length ? values.join('').slice(0, 64) : 'NM';
 }
 
 function missCount(statistics) {
@@ -130,30 +156,32 @@ function missCount(statistics) {
 }
 
 function normalizeScore(score) {
-  const beatmap = score.beatmap || {};
-  const set = score.beatmapset || {};
-  const difficulty = beatmap.version || 'Unknown';
-  const artist = set.artist_unicode || set.artist || 'Unknown Artist';
-  const title = set.title_unicode || set.title || 'Unknown Title';
-  const mapName = `${artist} - ${title} [${difficulty}]`;
-  const endedAt = score.ended_at || score.created_at || null;
+  const beatmap = score?.beatmap || {};
+  const set = score?.beatmapset || {};
+  const difficulty = safeText(beatmap.version || 'Unknown', 160);
+  const artist = safeText(set.artist_unicode || set.artist || 'Unknown Artist', 160);
+  const title = safeText(set.title_unicode || set.title || 'Unknown Title', 200);
+  const mapName = `${artist} - ${title} [${difficulty}]`.slice(0, 500);
+  const endedAt = score?.ended_at || score?.created_at || null;
+  const scoreId = String(score?.id ?? '').trim();
+  if (!/^\d+$/.test(scoreId)) throw new Error('osu! APIから不正なScore IDが返されました。');
 
   return {
-    id: `osu:${score.id}`,
+    id: `osu:${scoreId}`,
     source: 'osu-api',
-    osuScoreId: String(score.id),
+    osuScoreId: scoreId,
     beatmapId: score.beatmap_id ?? beatmap.id ?? null,
     beatmapsetId: set.id ?? beatmap.beatmapset_id ?? null,
     mapName,
     artist,
     title,
     difficulty,
-    mapper: set.creator || '',
+    mapper: safeText(set.creator || '', 120),
     date: endedAt ? String(endedAt).slice(0, 10) : '',
-    playedAt: endedAt,
+    playedAt: endedAt ? safeText(endedAt, 64) : null,
     accuracy: Number(((Number(score.accuracy || 0)) * 100).toFixed(4)),
-    miss: missCount(score.statistics),
-    combo: Number(score.max_combo || 0),
+    miss: Math.max(0, missCount(score.statistics)),
+    combo: Math.max(0, Number(score.max_combo || 0)),
     pp: score.pp == null ? null : Number(score.pp),
     stars: beatmap.difficulty_rating == null ? null : Number(beatmap.difficulty_rating),
     bpm: beatmap.bpm == null ? null : Number(beatmap.bpm),
@@ -162,22 +190,25 @@ function normalizeScore(score) {
     cs: beatmap.cs == null ? null : Number(beatmap.cs),
     hp: beatmap.drain == null ? null : Number(beatmap.drain),
     mods: modAcronyms(score.mods),
-    rank: score.rank || '',
+    rank: safeText(score.rank || '', 16),
     passed: Boolean(score.passed),
     hasReplay: Boolean(score.has_replay),
-    totalScore: Number(score.total_score ?? score.score ?? 0),
-    coverUrl: set.covers?.cover || set.covers?.['cover@2x'] || '',
+    totalScore: Math.max(0, Number(score.total_score ?? score.score ?? 0)),
+    coverUrl: safeText(set.covers?.cover || set.covers?.['cover@2x'] || '', 500),
     beatmapUrl: beatmap.id ? `https://osu.ppy.sh/beatmaps/${beatmap.id}` : '',
   };
 }
 
 function normalizeUser(user, ruleset) {
+  if (!user || !Number.isFinite(Number(user.id)) || !String(user.username || '').trim()) {
+    throw new Error('osu! APIから不正なユーザー情報が返されました。');
+  }
   const stats = user.statistics || {};
   return {
-    id: user.id,
-    username: user.username,
-    avatarUrl: user.avatar_url || '',
-    countryCode: user.country_code || '',
+    id: Number(user.id),
+    username: safeText(user.username, 64),
+    avatarUrl: safeText(user.avatar_url || '', 500),
+    countryCode: safeText(user.country_code || '', 8),
     ruleset,
     pp: stats.pp == null ? null : Number(stats.pp),
     globalRank: stats.global_rank ?? null,
@@ -205,12 +236,17 @@ async function handleSync(url, env) {
     offset: '0',
   });
   const scores = await osuFetch(env, `/api/v2/users/${user.id}/scores/recent?${params}`);
+  if (!Array.isArray(scores)) {
+    const error = new Error('osu! APIのRecent Scores応答形式が正しくありません。');
+    error.status = 502;
+    throw error;
+  }
 
   return {
     apiVersion: API_VERSION,
     syncedAt: new Date().toISOString(),
     user: normalizeUser(user, ruleset),
-    scores: Array.isArray(scores) ? scores.map(normalizeScore) : [],
+    scores: scores.slice(0, limit).map(normalizeScore),
   };
 }
 
