@@ -23,11 +23,7 @@
       "id": "tablet",
       "name": "OpenTabletDriver.UX",
       "targetPath": "",
-      "candidates": [
-        "OpenTabletDriver.UX.Wpf.exe",
-        "OpenTabletDriver.UX.exe",
-        "OpenTabletDriver.Daemon.exe"
-      ],
+      "candidates": ["OpenTabletDriver.UX.Wpf.exe", "OpenTabletDriver.UX.exe", "OpenTabletDriver.Daemon.exe"],
       "args": [],
       "enabled": true,
       "waitAfterMs": 900,
@@ -47,17 +43,7 @@
       "id": "osu",
       "name": "osu!lazer",
       "targetPath": "",
-      "candidates": [
-        "osu!.exe",
-        "osu.exe",
-        "osu-lazer.exe",
-        "osu.Game.exe",
-        "osu.Desktop.exe",
-        "osu-lazer.Desktop.exe",
-        "osu!.lnk",
-        "osu lazer.lnk",
-        "osu!lazer.lnk"
-      ],
+      "candidates": ["osu!.exe", "osu.exe", "osu-lazer.exe", "osu.Game.exe", "osu.Desktop.exe", "osu-lazer.Desktop.exe", "osu!.lnk", "osu lazer.lnk", "osu!lazer.lnk"],
       "args": [],
       "enabled": true,
       "waitAfterMs": 0,
@@ -73,8 +59,8 @@
   ],
   "updateCheck": {
     "enabled": true,
-    "versionUrl": "https://raw.githubusercontent.com/EliteMay/osu-setup-launcher/main/version.json",
-    "memo": "更新確認はversion.jsonのURLを見に行く軽量方式です。URL未設定ならスキップします。自動上書き更新は行いません。",
+    "versionUrl": "https://raw.githubusercontent.com/EliteMay/osu-hub/main/version.json",
+    "memo": "更新確認はosu-hubのversion.jsonを参照します。自動上書き更新は行いません。",
     "lastDownloadUrl": ""
   },
   "appVersion": "0.17.0"
