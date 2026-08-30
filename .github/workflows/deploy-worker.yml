@@ -31,12 +31,10 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          OSU_CLIENT_ID: ${{ secrets.OSU_CLIENT_ID }}
-          OSU_CLIENT_SECRET: ${{ secrets.OSU_CLIENT_SECRET }}
         run: |
           set -euo pipefail
           missing=0
-          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID OSU_CLIENT_ID OSU_CLIENT_SECRET; do
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID; do
             if [ -z "${!name:-}" ]; then
               echo "::error::Missing repository secret: ${name}"
               missing=1
@@ -55,12 +53,6 @@ jobs:
           workingDirectory: cloudflare/worker
           wranglerVersion: "4.127.1"
           command: deploy
-          secrets: |
-            OSU_CLIENT_ID
-            OSU_CLIENT_SECRET
-        env:
-          OSU_CLIENT_ID: ${{ secrets.OSU_CLIENT_ID }}
-          OSU_CLIENT_SECRET: ${{ secrets.OSU_CLIENT_SECRET }}
 
       - name: Verify deployed Worker
         shell: bash
@@ -83,8 +75,10 @@ jobs:
             const fs = require("fs");
             const value = JSON.parse(fs.readFileSync(0, "utf8"));
             if (value?.ok !== true) throw new Error("Worker health returned ok=false");
-            if (value?.configured !== true) throw new Error("osu! OAuth secrets are not configured in Worker");
+            if (value?.configured !== true) throw new Error("Worker is not configured");
             if (value?.service !== "osu-hub-api") throw new Error("Unexpected Worker service response");
+            if (value?.upstreamMode !== "public-web") throw new Error("Worker is not using public-web upstream mode");
+            if (value?.oauthRequired !== false) throw new Error("Worker unexpectedly requires osu! OAuth");
             console.log("Worker health check: OK");
           '
 
@@ -93,6 +87,7 @@ jobs:
             echo
             echo "- URL: ${DEPLOYMENT_URL}"
             echo "- /health: OK"
-            echo "- osu! OAuth secrets: configured"
+            echo "- osu! upstream: public profile web endpoints"
+            echo "- osu! OAuth: not required"
             echo "- Trigger: ${GITHUB_EVENT_NAME}"
           } >> "$GITHUB_STEP_SUMMARY"
