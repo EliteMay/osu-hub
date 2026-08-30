@@ -138,7 +138,7 @@ jobs:
             OSU_ACCESS_TOKEN
           command: deploy
 
-      - name: Record refresh result
+      - name: Verify Worker after token refresh
         shell: bash
         env:
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
@@ -148,6 +148,43 @@ jobs:
             echo "::error::Wrangler did not return a deployment URL."
             exit 1
           fi
+
+          base_url="${DEPLOYMENT_URL%/}"
+          health="$(curl --fail --silent --show-error \
+            --retry 4 --retry-delay 2 --retry-all-errors \
+            --connect-timeout 10 --max-time 30 \
+            "${base_url}/health")"
+
+          printf '%s' "$health" | node -e '
+            const fs = require("fs");
+            const value = JSON.parse(fs.readFileSync(0, "utf8"));
+            if (value?.ok !== true || value?.configured !== true) throw new Error("Worker health is not ready after token refresh");
+            if (value?.upstreamMode !== "api-v2-preissued-token") throw new Error("Unexpected Worker upstream mode");
+            if (value?.browserOAuthRequired !== false) throw new Error("Browser OAuth credentials must not be required");
+            if (value?.tokenManagedBy !== "github-actions") throw new Error("Unexpected token management mode");
+            console.log("Worker health after token refresh: OK");
+          '
+
+          sync="$(curl --fail --silent --show-error \
+            --retry 2 --retry-delay 2 --retry-all-errors \
+            --connect-timeout 10 --max-time 30 \
+            "${base_url}/api/sync?user=2&mode=osu&limit=1&include_fails=1")"
+
+          printf '%s' "$sync" | node -e '
+            const fs = require("fs");
+            const value = JSON.parse(fs.readFileSync(0, "utf8"));
+            if (value?.apiVersion !== 1 || value?.upstreamMode !== "api-v2-preissued-token") throw new Error("Unexpected sync response after token refresh");
+            if (!value?.user || Number(value.user.id) !== 2) throw new Error("Get User smoke test failed after token refresh");
+            if (!Array.isArray(value.scores) || value.scores.length > 1) throw new Error("Recent Scores smoke test failed after token refresh");
+            console.log(`Worker sync after token refresh: OK (${value.scores.length} recent score(s))`);
+          '
+
+      - name: Record refresh result
+        shell: bash
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
+        run: |
+          set -euo pipefail
           {
             echo "## osu! API token refresh"
             echo
@@ -156,5 +193,7 @@ jobs:
             echo "- Stored in Worker secret: OSU_ACCESS_TOKEN"
             echo "- Client Secret stored in Worker: no"
             echo "- Worker redeployed: ${DEPLOYMENT_URL}"
+            echo "- /health after refresh: OK"
+            echo "- /api/sync after refresh: OK"
             echo "- Trigger: ${GITHUB_EVENT_NAME}"
           } >> "$GITHUB_STEP_SUMMARY"
