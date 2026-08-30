@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="osu! APIからRecent Scoresを取得してosu! Hubへ保存するAccount Sync設定。">
   <title>Account Sync | osu! Hub</title>
   <link rel="stylesheet" href="../css/styles.css">
 </head>
@@ -25,11 +26,11 @@
     <div>
       <p class="eyebrow">osu! api sync</p>
       <h1>Account Sync</h1>
-      <p class="lead">Cloudflare Worker経由でosu!api v2から最近のプレイを取得し、Resultsへ自動保存する。Failも含めて練習傾向を残せる。</p>
+      <p class="lead">Cloudflare Worker経由でosu!api v2から最近のプレイを取得し、Resultsへ自動保存する。Worker未設定時はここでセットアップする。</p>
     </div>
   </section>
 
-  <section class="metric-grid">
+  <section class="metric-grid" aria-label="同期概要">
     <article class="metric"><span>Saved Account</span><strong id="savedAccount">--</strong><small>現在の同期対象</small></article>
     <article class="metric"><span>Fetched</span><strong id="fetchedCount">0</strong><small>今回取得</small></article>
     <article class="metric"><span>Added</span><strong id="addedCount">0</strong><small>新規Results</small></article>
@@ -41,15 +42,16 @@
       <div class="panel-title"><div><p class="eyebrow">connection</p><h2>同期設定</h2></div></div>
       <form id="accountForm" class="form-grid">
         <div class="field full">
-          <label>Cloudflare Worker URL</label>
-          <input id="workerUrl" name="workerUrl" inputmode="url" placeholder="https://osu-hub-api.xxxxx.workers.dev">
+          <label for="workerUrl">Cloudflare Worker URL</label>
+          <input id="workerUrl" name="workerUrl" type="url" inputmode="url" placeholder="https://osu-hub-api.xxxxx.workers.dev" aria-describedby="workerHelp">
+          <small id="workerHelp" class="muted">本番はHTTPSのみ。ローカル開発時だけlocalhost / 127.0.0.1のHTTPを許可します。</small>
         </div>
         <div class="field">
-          <label>osu! User ID / ユーザー名</label>
+          <label for="osuUser">osu! User ID / ユーザー名</label>
           <input id="osuUser" name="user" autocomplete="off" placeholder="12345678 または username">
         </div>
         <div class="field">
-          <label>Ruleset</label>
+          <label for="osuMode">Ruleset</label>
           <select id="osuMode" name="mode">
             <option value="osu">osu!standard</option>
             <option value="taiko">osu!taiko</option>
@@ -58,11 +60,11 @@
           </select>
         </div>
         <div class="field">
-          <label>1回の取得件数</label>
+          <label for="syncLimit">1回の取得件数</label>
           <input id="syncLimit" name="limit" type="number" min="1" max="100" step="1" value="100">
         </div>
         <div class="field">
-          <label>Failしたプレイ</label>
+          <label for="includeFails">Failしたプレイ</label>
           <select id="includeFails" name="includeFails">
             <option value="1">含める</option>
             <option value="0">含めない</option>
@@ -76,14 +78,14 @@
           </div>
         </div>
       </form>
-      <div id="syncStatus" class="notice" style="margin-top:18px">Worker URLとosu!アカウントを設定してください。</div>
+      <div id="syncStatus" class="notice" role="status" aria-live="polite" style="margin-top:18px">Worker URLとosu!アカウントを設定してください。</div>
     </section>
 
     <aside class="stack">
       <section class="panel flat">
         <p class="eyebrow">account</p>
         <h2 id="accountName">--</h2>
-        <img id="accountAvatar" class="hidden" alt="osu! avatar" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:1px solid var(--line);margin:8px 0 14px">
+        <img id="accountAvatar" class="account-avatar hidden" alt="osu! avatar">
         <div class="data-list">
           <div class="practice-card"><span>PP</span><div><strong id="accountPp">--</strong><small>Performance Points</small></div><span></span></div>
           <div class="practice-card"><span>Rank</span><div><strong id="accountRank">--</strong><small>Global Rank</small></div><span></span></div>
@@ -99,12 +101,13 @@
 
   <section class="panel">
     <div class="panel-title"><div><p class="eyebrow">latest sync</p><h2>今回取得したリザルト</h2></div><a href="./results.html">Resultsで見る →</a></div>
-    <div id="syncPreview" class="list-empty">まだ同期していません。</div>
+    <div id="syncPreview" class="list-empty">まだ同期していません。Worker接続テスト後に「今すぐ同期」を実行してください。</div>
   </section>
 </main>
 
-<footer class="footer"><span>osu! Hub v0.2.0</span><span>osu! API credentials stay on Cloudflare.</span></footer>
+<footer class="footer"><span>osu! Hub <strong data-site-version></strong></span><span>osu! API credentials stay on Cloudflare.</span></footer>
 <script src="../js/storage.js"></script>
 <script src="../js/osu-sync.js"></script>
+<script src="../js/site-meta.js"></script>
 </body>
 </html>
