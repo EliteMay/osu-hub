@@ -2,13 +2,43 @@
 
 Web Versionの正本は `data/site.json` の `siteVersion` です。Desktop Launcher Versionの正本は `package.json` の `version` です。
 
+## Web 0.2.4 - 2026-08-30
+
+### Fixed
+
+- Cloudflare Worker経由のClient Credentials `/oauth/token` で429が継続する問題を回避
+- Account Syncをosu! OAuth非依存の公開プロフィール / Recent Scores経路へ変更
+- Account Sync画面から不要になったClient ID / Secret案内を削除
+
+### Changed
+
+- Workerは公開プロフィールHTMLの `data-initial-data` からUser / Statisticsを取得
+- Recent Scoresはosu!公式Webが利用する公開Web Routeから最大100件取得
+- 同一同期条件の60秒Cacheと429 / Retry-After処理は維持
+- Worker deployに必要なSecretをCloudflare Account ID / API Tokenのみに変更
+- `/health` へ `upstreamMode: public-web` / `oauthRequired: false` を追加
+- Static ValidationでOAuth依存の再混入を検出
+
+### Compatibility
+
+- IndexedDB DB / Version / Store変更なし
+- Result ID `osu:<score id>` 変更なし
+- Backup Schema変更なし
+- Electron Launcher変更なし
+
+### Risk / Unverified
+
+- 公開Web Route / Profile HTMLはosu! Web実装変更の影響を受ける
+- Web 0.2.4本番deploy後の実アカウントRecent Scores同期
+- Account Sync → Results → Statsの実ブラウザE2E
+
 ## Web 0.2.3 - 2026-08-30
 
 ### Fixed
 
 - osu! OAuth 429対策としてアクセストークンをCloudflare Cache APIへ共有キャッシュ
 - 同一Isolate内の同時Token取得を1回へ集約
-- 同一同期条件の結果を60秒キャッシュし、短時間の連打でosu! APIを再取得しない
+- 同一同期条件の結果を60秒キャッシュ
 - OAuth / API 429を明示的に扱い、Retry-Afterがあれば利用者へ返す
 
 ### Changed
@@ -16,10 +46,9 @@ Web Versionの正本は `data/site.json` の `siteVersion` です。Desktop Laun
 - `cloudflare/worker/**` またはdeploy workflowがmainへ入ったときWorkerを自動deployするCDへ変更
 - Rate limit対策が消えないようStatic Validationを追加
 
-### Unverified
+### Result
 
-- 修正後の実アカウントRecent Scores同期
-- Account Sync → Results → Statsの実ブラウザE2E
+- CI / Worker deployは成功したが、実ブラウザではOAuth Token Endpoint 429が継続したため0.2.4でOAuth依存自体を廃止
 
 ## Web 0.2.2 - 2026-08-30
 
@@ -34,7 +63,7 @@ Web Versionの正本は `data/site.json` の `siteVersion` です。Desktop Laun
 - `Deploy osu Hub API Worker` Workflow成功
 - Worker URL発行
 - `/health` 成功
-- osu! OAuth Secret設定済み状態をWorkflowで確認
+- 当時のosu! OAuth Secret設定済み状態をWorkflowで確認
 
 ## Web 0.2.1 - 2026-08-30
 
