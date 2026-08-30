@@ -67,7 +67,7 @@
       user: String($('#osuUser').value || '').trim(),
       mode: $('#osuMode').value || 'osu',
       limit: Math.min(100, Math.max(1, number($('#syncLimit').value, 100))),
-      includeFails: $('#includeFails').checked,
+      includeFails: $('#includeFails').value !== '0',
     };
     await DB.put('settings', value);
     return value;
@@ -193,6 +193,7 @@
 
       renderUser(payload.user);
       renderPreview(payload.scores);
+      $('#savedAccount').textContent = payload.user?.username || settings.user;
       $('#fetchedCount').textContent = payload.scores.length;
       $('#addedCount').textContent = counts.added;
       $('#updatedCount').textContent = counts.updated;
@@ -213,7 +214,7 @@
     $('#osuUser').value = settings.user;
     $('#osuMode').value = settings.mode;
     $('#syncLimit').value = settings.limit;
-    $('#includeFails').checked = settings.includeFails;
+    $('#includeFails').value = settings.includeFails ? '1' : '0';
     $('#lastSync').textContent = settings.lastSyncAt ? new Date(settings.lastSyncAt).toLocaleString('ja-JP') : '--';
     $('#savedAccount').textContent = settings.resolvedUsername || settings.user || '--';
 
