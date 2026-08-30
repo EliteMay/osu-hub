@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Results | osu! Hub</title><link rel="stylesheet" href="../css/styles.css"></head>
+<body data-page="results">
+<header class="topbar"><a class="brand" href="../index.html"><span class="brand-mark">osu!</span><span>Hub</span></a><nav class="nav"><a href="./coaching.html">AI Coach</a><a href="./results.html">Results</a><a href="./practice.html">Practice</a><a href="./stats.html">Stats</a><a href="./settings.html">Settings</a><a href="./tools.html">Desktop Tools</a></nav></header>
+<main class="container">
+<section class="page-head"><div><p class="eyebrow">performance log</p><h1>Results</h1><p class="lead">リザルトを軽く記録して、後から成長と苦手傾向を比較する。</p></div></section>
+<section class="metric-grid"><article class="metric"><span>Results</span><strong id="resultCount">0</strong><small>登録数</small></article><article class="metric"><span>Average ACC</span><strong id="resultAvgAcc">--</strong><small>登録分の平均</small></article><article class="metric"><span>Total Miss</span><strong id="resultTotalMiss">0</strong><small>登録分の合計</small></article><article class="metric"><span>Storage</span><strong>Local</strong><small>IndexedDB</small></article></section>
+<section class="panel"><div class="panel-title"><div><p class="eyebrow">add result</p><h2>リザルトを記録</h2></div></div>
+<form id="resultForm" class="form-grid three">
+<div class="field full"><label>譜面名</label><input name="mapName" required placeholder="Artist - Title [Difficulty]"></div>
+<div class="field"><label>日付</label><input id="resultDate" name="date" type="date"></div><div class="field"><label>MOD</label><input name="mods" value="NM" placeholder="NM / HD / HR / DT"></div><div class="field"><label>Accuracy %</label><input name="accuracy" type="number" min="0" max="100" step="0.01" placeholder="98.25"></div>
+<div class="field"><label>Miss</label><input name="miss" type="number" min="0" step="1" placeholder="2"></div><div class="field"><label>Combo</label><input name="combo" type="number" min="0" step="1" placeholder="840"></div><div class="field"><label>PP</label><input name="pp" type="number" min="0" step="0.1" placeholder="185.4"></div>
+<div class="field"><label>★</label><input name="stars" type="number" min="0" step="0.01" placeholder="6.25"></div><div class="field"><label>BPM</label><input name="bpm" type="number" min="0" step="1" placeholder="210"></div><div class="field"><label>メモ</label><input name="note" placeholder="後半で崩れた"></div>
+<div class="field full"><div class="actions"><button class="button primary" type="submit">保存</button></div></div>
+</form></section>
+<section class="panel"><div class="panel-title"><div><p class="eyebrow">history</p><h2>保存済みリザルト</h2></div><a href="./stats.html">統計を見る →</a></div><div id="resultList" class="list-empty">まだリザルトがありません。</div></section>
+</main><footer class="footer"><span>osu! Hub v0.1.0</span><span>画像からの自動OCRは後続機能として追加予定。</span></footer><script src="../js/storage.js"></script><script src="../js/app.js"></script></body></html>
