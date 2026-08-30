@@ -23,6 +23,12 @@
       "src/**/*",
       "data/**/*",
       "tools/**/*",
+      "!tools/*.exe",
+      "!tools/*.zip",
+      "!tools/*.chm",
+      "!tools/_nircmd_download/**/*",
+      "!tools/nircmd_package/**/*",
+      "!tools/NirCmd_source_notice.txt",
       "package.json",
       "README.md",
       "作業報告書.md"
