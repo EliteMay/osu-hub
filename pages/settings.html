@@ -33,7 +33,7 @@
   <aside class="stack">
     <section class="panel flat">
       <p class="eyebrow">backup</p><h2>データ保存</h2>
-      <p class="muted">Results / Coaching / Practice / SettingsをまとめてJSONへ書き出す。Import時はSchema・ID整合性を検証し、失敗時は既存データを変更しません。</p>
+      <p class="muted">Results / Coaching / Practice / SettingsをまとめてJSONへ書き出す。Importは全体を検証してRecovery Snapshotを作成し、読み戻し確認に失敗した場合はRollbackを試みます。</p>
       <div class="actions"><button id="exportBackup" class="button primary" type="button">バックアップを書き出す</button></div>
       <div class="field" style="margin-top:16px"><label for="backupFile">バックアップJSON</label><input id="backupFile" type="file" accept="application/json,.json"></div>
       <div class="actions"><button id="importBackup" class="button ghost" type="button">バックアップを検証して読み込む</button></div>
