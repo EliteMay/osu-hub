@@ -65,11 +65,13 @@ jobs:
             exit 1
           fi
 
-          echo "Worker URL: ${DEPLOYMENT_URL}"
+          base_url="${DEPLOYMENT_URL%/}"
+          echo "Worker URL: ${base_url}"
+
           health="$(curl --fail --silent --show-error \
             --retry 4 --retry-delay 2 --retry-all-errors \
             --connect-timeout 10 --max-time 30 \
-            "${DEPLOYMENT_URL%/}/health")"
+            "${base_url}/health")"
 
           printf '%s' "$health" | node -e '
             const fs = require("fs");
@@ -82,11 +84,35 @@ jobs:
             console.log("Worker health check: OK");
           '
 
+          # Public user ID 2 is used only as a lightweight end-to-end route probe.
+          # A zero-length recent-score list is valid; the smoke test verifies that
+          # profile resolution and the public Recent Scores route both return the
+          # expected osu! Hub response shape without OAuth.
+          sync="$(curl --fail --silent --show-error \
+            --retry 2 --retry-delay 2 --retry-all-errors \
+            --connect-timeout 10 --max-time 30 \
+            "${base_url}/api/sync?user=2&mode=osu&limit=1&include_fails=1")"
+
+          printf '%s' "$sync" | node -e '
+            const fs = require("fs");
+            const value = JSON.parse(fs.readFileSync(0, "utf8"));
+            if (value?.apiVersion !== 1) throw new Error("Unexpected sync apiVersion");
+            if (value?.upstreamMode !== "public-web") throw new Error("Sync did not use public-web upstream mode");
+            if (!value?.user || Number(value.user.id) !== 2) throw new Error("Public profile resolution smoke test failed");
+            if (!Array.isArray(value.scores)) throw new Error("Recent Scores response is not an array");
+            if (value.scores.length > 1) throw new Error("Recent Scores smoke limit was not respected");
+            for (const score of value.scores) {
+              if (!/^osu:\d+$/.test(String(score?.id || ""))) throw new Error("Invalid normalized score id");
+            }
+            console.log(`Worker account-sync smoke test: OK (${value.scores.length} recent score(s))`);
+          '
+
           {
             echo "## Cloudflare Worker deployment"
             echo
-            echo "- URL: ${DEPLOYMENT_URL}"
+            echo "- URL: ${base_url}"
             echo "- /health: OK"
+            echo "- /api/sync public route smoke test: OK"
             echo "- osu! upstream: public profile web endpoints"
             echo "- osu! OAuth: not required"
             echo "- Trigger: ${GITHUB_EVENT_NAME}"
