@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Account Sync | osu! Hub</title>
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body data-page="account">
+<header class="topbar">
+  <a class="brand" href="../index.html"><span class="brand-mark">osu!</span><span>Hub</span></a>
+  <nav class="nav" aria-label="メインナビゲーション">
+    <a href="./account.html" class="active">Account Sync</a>
+    <a href="./coaching.html">AI Coach</a>
+    <a href="./results.html">Results</a>
+    <a href="./practice.html">Practice</a>
+    <a href="./stats.html">Stats</a>
+    <a href="./settings.html">Settings</a>
+    <a href="./tools.html">Desktop Tools</a>
+  </nav>
+</header>
+
+<main class="container">
+  <section class="page-head">
+    <div>
+      <p class="eyebrow">osu! api sync</p>
+      <h1>Account Sync</h1>
+      <p class="lead">Cloudflare Worker経由でosu!api v2から最近のプレイを取得し、Resultsへ自動保存する。Failも含めて練習傾向を残せる。</p>
+    </div>
+  </section>
+
+  <section class="metric-grid">
+    <article class="metric"><span>Saved Account</span><strong id="savedAccount">--</strong><small>現在の同期対象</small></article>
+    <article class="metric"><span>Fetched</span><strong id="fetchedCount">0</strong><small>今回取得</small></article>
+    <article class="metric"><span>Added</span><strong id="addedCount">0</strong><small>新規Results</small></article>
+    <article class="metric"><span>Updated</span><strong id="updatedCount">0</strong><small>既存スコア更新</small></article>
+  </section>
+
+  <div class="split">
+    <section class="panel flat">
+      <div class="panel-title"><div><p class="eyebrow">connection</p><h2>同期設定</h2></div></div>
+      <form id="accountForm" class="form-grid">
+        <div class="field full">
+          <label>Cloudflare Worker URL</label>
+          <input id="workerUrl" name="workerUrl" inputmode="url" placeholder="https://osu-hub-api.xxxxx.workers.dev">
+        </div>
+        <div class="field">
+          <label>osu! User ID / ユーザー名</label>
+          <input id="osuUser" name="user" autocomplete="off" placeholder="12345678 または username">
+        </div>
+        <div class="field">
+          <label>Ruleset</label>
+          <select id="osuMode" name="mode">
+            <option value="osu">osu!standard</option>
+            <option value="taiko">osu!taiko</option>
+            <option value="fruits">osu!catch</option>
+            <option value="mania">osu!mania</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>1回の取得件数</label>
+          <input id="syncLimit" name="limit" type="number" min="1" max="100" step="1" value="100">
+        </div>
+        <div class="field">
+          <label>Failしたプレイ</label>
+          <select id="includeFailsSelect" aria-label="Failしたプレイの取得設定">
+            <option value="1">含める</option>
+            <option value="0">含めない</option>
+          </select>
+          <input id="includeFails" name="includeFails" type="checkbox" checked class="hidden">
+        </div>
+        <div class="field full">
+          <div class="actions">
+            <button class="button ghost" type="submit">設定を保存</button>
+            <button id="testWorker" class="button ghost" type="button">Worker接続テスト</button>
+            <button id="syncNow" class="button primary" type="button">今すぐ同期</button>
+          </div>
+        </div>
+      </form>
+      <div id="syncStatus" class="notice" style="margin-top:18px">Worker URLとosu!アカウントを設定してください。</div>
+    </section>
+
+    <aside class="stack">
+      <section class="panel flat">
+        <p class="eyebrow">account</p>
+        <h2 id="accountName">--</h2>
+        <img id="accountAvatar" class="hidden" alt="osu! avatar" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:1px solid var(--line);margin:8px 0 14px">
+        <div class="data-list">
+          <div class="practice-card"><span>PP</span><div><strong id="accountPp">--</strong><small>Performance Points</small></div><span></span></div>
+          <div class="practice-card"><span>Rank</span><div><strong id="accountRank">--</strong><small>Global Rank</small></div><span></span></div>
+          <div class="practice-card"><span>ACC</span><div><strong id="accountAcc">--</strong><small>Profile Accuracy</small></div><span></span></div>
+          <div class="practice-card"><span>Sync</span><div><strong id="lastSync">--</strong><small>最終同期</small></div><span></span></div>
+        </div>
+      </section>
+      <section class="panel flat">
+        <div class="notice"><strong>Secretはサイトへ入れない</strong><br>osu! Client ID / Client SecretはCloudflare WorkerのSecretとして保存します。このページに入力するのはWorker URLだけです。</div>
+      </section>
+    </aside>
+  </div>
+
+  <section class="panel">
+    <div class="panel-title"><div><p class="eyebrow">latest sync</p><h2>今回取得したリザルト</h2></div><a href="./results.html">Resultsで見る →</a></div>
+    <div id="syncPreview" class="list-empty">まだ同期していません。</div>
+  </section>
+</main>
+
+<footer class="footer"><span>osu! Hub v0.2.0</span><span>osu! API credentials stay on Cloudflare.</span></footer>
+<script src="../js/storage.js"></script>
+<script src="../js/osu-sync.js"></script>
+<script>
+  const select = document.getElementById('includeFailsSelect');
+  const checkbox = document.getElementById('includeFails');
+  const syncSelect = () => { checkbox.checked = select.value === '1'; };
+  select.addEventListener('change', syncSelect);
+  const observer = new MutationObserver(() => { select.value = checkbox.checked ? '1' : '0'; });
+  observer.observe(checkbox, { attributes: true, attributeFilter: ['checked'] });
+</script>
+</body>
+</html>
