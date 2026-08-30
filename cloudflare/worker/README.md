@@ -16,6 +16,17 @@ GitHub Pagesからosu!api v2へ安全にアクセスするためのCloudflare Wo
 
 Workerの稼働とosu! OAuth Secret設定の有無を返します。Secret値そのものは返しません。
 
+期待例:
+
+```json
+{
+  "ok": true,
+  "service": "osu-hub-api",
+  "apiVersion": 1,
+  "configured": true
+}
+```
+
 ### `GET /api/sync`
 
 例:
@@ -37,9 +48,38 @@ osu!のAccount SettingsからOAuth Applicationを登録します。
 
 Client Credentialsだけを使うため、Callback URLは空欄で構いません。
 
-取得したClient Secretはパスワードと同様に扱い、GitHubやHTML/JavaScriptへ書かないでください。
+取得したClient Secretはパスワードと同様に扱い、GitHubの通常ファイル、HTML、JavaScript、チャット等へ貼らないでください。
 
-## Cloudflareへ設定
+## 推奨: GitHub Actionsから本番deploy
+
+`.github/workflows/deploy-worker.yml` を手動実行して本番Workerをdeployできます。
+
+GitHub Repository SettingsのActions Secretsへ次の4つを登録します。
+
+```text
+CLOUDFLARE_ACCOUNT_ID
+CLOUDFLARE_API_TOKEN
+OSU_CLIENT_ID
+OSU_CLIENT_SECRET
+```
+
+`CLOUDFLARE_API_TOKEN` はCloudflare公式のWorkers編集用Tokenを使い、対象Accountへ必要最小限にScopeしてください。
+
+Workflowは:
+
+1. 必須Secretの存在確認
+2. `cloudflare/wrangler-action@v4` でdeploy
+3. `OSU_CLIENT_ID` / `OSU_CLIENT_SECRET` をWorker Secretとして反映
+4. deploy先 `/health` を確認
+5. GitHub Actions SummaryへWorker URLを表示
+
+までを行います。
+
+Workflowは初期設定中の誤deployを避けるため、現時点では `workflow_dispatch` の手動実行のみです。
+
+## 手動deploy fallback
+
+GitHub Actionsを使わない場合はローカルから実行できます。
 
 ```bash
 cd cloudflare/worker
@@ -57,6 +97,8 @@ npm run deploy
 ```text
 https://osu-hub-api.<subdomain>.workers.dev
 ```
+
+本番URLが確定したら `data/site.json` の `osuApi.workerUrl` へ反映し、GitHub Pages側の既定値として使います。
 
 ## ローカル開発
 
