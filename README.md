@@ -17,16 +17,7 @@ Project Profile:
 STATIC + DATA + AI-HANDOFF + CLOUD + ELECTRON + TOOL
 ```
 
-採用Version、Profile、Runtime方針は `project-meta.json` に記録します。
-
-## Source of Truth
-
-- Web Version: `data/site.json#siteVersion`
-- Web Storage Schema: `js/storage.js#SCHEMA_VERSION`
-- Desktop Launcher Version: `package.json#version`
-- Desktop更新情報: `version.json`
-
-Webの正式Runtimeは `js/app.js`、`js/storage.js`、`js/osu-sync.js`、`js/site-meta.js` 等の安定Pathを利用します。
+正本は `project-meta.json`。Web Versionは `data/site.json#siteVersion`、Web Storage Schemaは `js/storage.js#SCHEMA_VERSION`、Desktop Versionは `package.json#version` です。
 
 ## 公開URL
 
@@ -42,33 +33,32 @@ osu! API Worker:
 https://osu-hub-api.k12m45k.workers.dev
 ```
 
-Worker URLは公開Endpointであり、秘密情報ではありません。osu! Client SecretやCloudflare API Tokenは公開ファイルへ保存しません。
+Worker URLは公開Endpointです。osu! Client SecretやCloudflare API Tokenは公開ファイルへ保存しません。
 
 ## Account Sync
 
 `pages/account.html` からCloudflare Worker経由でosu!api v2を利用します。
 
-- osu! User IDまたはユーザー名を指定
-- ruleset選択
-- Recent Scoresを1〜100件取得
+- osu! User IDまたはユーザー名
+- ruleset
+- Recent Scores 1〜100件
 - Failスコアを含める設定
-- `osu:<score id>` をキーに重複整理
-- API同期済みResultは再同期時に更新
-- 手入力Resultは削除しない
-- API Resultへ付けた手動メモは同期更新で維持
-- Browser側15秒、Worker上流側12秒のtimeout
+- `osu:<score id>` で重複整理
+- 手入力Resultsは削除しない
+- API同期Resultの手動メモは再同期で維持
+- Browser timeout 15秒 / Worker upstream timeout 12秒
 - Worker ResponseをBrowser側でもValidation
 
-本番Worker URLは `data/site.json` に設定済みです。Home / Account Syncは既定でこのWorkerを利用します。
+### Rate limit対策
 
-保存する主な値:
+osu!公式の利用方針に合わせ、APIを必要以上に再取得しません。
 
-- Accuracy / Miss / Combo / PP
-- Star Rating / BPM / AR / OD / CS / HP
-- MOD / Rank / Pass / Fail
-- Replay有無
-- Beatmap / Beatmapset ID
-- プレイ日時
+- OAuth access tokenはWorkerのメモリ + Cloudflare Cache APIで有効期限まで再利用
+- 同一Isolateの同時Token取得は1回へ集約
+- 同じ同期条件は60秒キャッシュ
+- OAuth / APIの429は明示的に扱い、Retry-Afterがある場合は利用者へ返す
+
+短時間に「今すぐ同期」を連打しても、同じユーザーのosu! API取得を毎回行わない設計です。
 
 ## Cloudflare Worker
 
@@ -83,8 +73,6 @@ cloudflare/worker/
 └─ README.md
 ```
 
-GitHub Actionsの `Deploy osu Hub API Worker` から本番deployできます。
-
 Repository Secrets:
 
 ```text
@@ -94,11 +82,7 @@ OSU_CLIENT_ID
 OSU_CLIENT_SECRET
 ```
 
-これらの秘密値はGitHub Pages、`data/site.json`、公開JavaScriptへ書きません。
-
-2026-08-30時点で本番deployは成功し、Workflowによる `/health` 確認でWorker稼働とosu! OAuth Secret設定済みを確認しています。
-
-Workerは任意URLを中継する汎用Proxyではなく、osu! Hubに必要な `/health` と `/api/sync` のみを提供します。
+`Deploy osu Hub API Worker` は手動実行に加え、mainの `cloudflare/worker/**` またはdeploy workflow変更時にも自動deployします。deploy後は `/health` でWorker稼働とSecret設定状態を確認します。
 
 ## AI Coaching
 
@@ -106,9 +90,9 @@ Workerは任意URLを中継する汎用Proxyではなく、osu! Hubに必要な 
 2. セッション名、目的、本人メモを入力
 3. ChatGPT提出用ZIPを生成
 4. ChatGPTへアップロード
-5. 返却されたSchema v1 JSONをWebへ取り込む
+5. 返却Schema v1 JSONをWebへ取り込む
 
-AI返却JSONはSchemaを検証してから保存します。画像は1枚20MBまで、最大100枚です。JSZip CDNが利用できない場合はJSON/TXT個別出力へFallbackします。
+AI返却JSONはValidation後に保存します。JSZip CDNが利用できない場合はJSON/TXT個別出力へFallbackします。
 
 ## Results / Stats / Practice / Settings
 
@@ -116,8 +100,6 @@ AI返却JSONはSchemaを検証してから保存します。画像は1枚20MBま
 - Stats: 平均ACC、平均Miss、最高PP、直近ACC、MOD別集計
 - Practice: 練習内容・時間・完了管理
 - Settings: DPI、感度、Tablet Area、JSON Backup / Import
-
-未実装機能は画面上でも開発予定として明示し、完成済み扱いしません。
 
 ## Backup / Import / Recovery
 
@@ -130,18 +112,7 @@ practice
 settings
 ```
 
-Importでは以下を行います。
-
-```text
-parse
-→ payload / record validation
-→ current recovery snapshot
-→ transaction write
-→ read-back verification
-→ failure時rollback
-```
-
-現在のImportは完全置換ではなくMerge方式です。同じKeyは更新し、新規Keyは追加します。
+Importは `parse → validation → recovery snapshot → transaction write → read-back verification → failure時rollback` の順で処理します。現在は完全置換ではなくMerge方式です。
 
 ## Desktop Tools
 
@@ -154,67 +125,32 @@ parse
 
 Windows固有処理は実Windowsで未確認の項目を確認済み扱いしません。
 
-## GitHub Pages
+## GitHub Pages / CI
 
-`.github/workflows/pages.yml` ではWebファイルだけを公開します。
+Pages ArtifactはWebファイルだけを公開します。Cloudflare Workerソース、Electronソース、bat、Secretファイルは含めません。
 
-```text
-index.html
-pages/
-css/
-js/
-data/site.json
-```
-
-Cloudflare Workerソース、Electronソース、bat、SecretファイルはPages Artifactへ含めません。
-
-## 自動チェック
-
-`.github/workflows/check-web.yml` はmain pushとPull Requestで実行します。
-
-主な検査:
-
-- JavaScript / JSON構文
-- HTMLローカル参照切れ / ID重複
-- Accessibility基本項目
-- Web Version直書き再混入
-- Project Profile / Guide Version
-- Desktop Version整合
-- Production Worker HTTPS / timeout設定
-- Secret値・Secret file誤追跡
-- Version付きRuntime Path再混入
-- MutationObserver DOM Patch再混入
-- Import Recovery / Verification / Rollback Guard
+`tests/validate-web.mjs` / `Check web` では、JS/JSON/HTML、Version、Project Profile、Secret混入、Import Recovery、Worker HTTPS/timeout、OAuth rate-limit guard、Worker CD設定などを確認します。
 
 ## 崩してはいけない仕様
 
-### Web / API
-
-- osu! Client Secret / Cloudflare API Tokenを公開コードへ入れない
+- Secretを公開コードへ入れない
 - 個人プレイデータをGitHubへ自動送信しない
 - 手入力ResultsをAPI同期で削除しない
 - 同一osu! Score IDの重複を増やさない
 - IndexedDBとJSON Backup / Importを維持する
+- API停止時もLocal機能を使えるようにする
 - AI Coachingに有料APIを必須化しない
-- API停止時も手入力等のLocal機能を使えるようにする
-- Stable RuntimeをVersion別Folderへコピーして増やさない
-
-### Desktop
-
-- 音声切替 → OpenTabletDriver → 遅延対策アプリ → osu!lazer の一括起動
-- osu!本体の自動操作・プレイ補助を行わない
-- 更新時にユーザー設定を意図せず消さない
-- 外部ツールexeや秘密情報を公開Repositoryへ直接含めない
+- Electron Launcherを削除しない
 
 ## 未確認 / 今後
 
-- 実osu!アカウントでRecent Scores同期
+- OAuth 429修正後の実osu!アカウントRecent Scores同期
 - Account Sync → Results → Statsの実ブラウザE2E
-- Backup → Import → 再読込 / Rollbackの実ブラウザE2E
-- API同期はRecent Scores最大100件。過去全履歴のページング同期は未実装
-- AI Coachingへ同期済みResultsを直接選択して含める機能は未実装
-- Windows実機でのSetup Launcher音声切替問題
-- GitHub ReleasesのSetup.exe初回配布
-- Root Electron / Cloudflare Workerの `package-lock.json` は未管理。次回dependency導入・更新時に実package managerで生成する
+- Backup / Import / Rollbackの実ブラウザE2E
+- Recent Scoresの過去全履歴ページング同期
+- 同期済みResultsをAI Coachingへ直接選択して含める機能
+- Windows実機でのSetup Launcher確認
+- Setup.exe初回GitHub Release
+- Root Electron / Cloudflare Workerの `package-lock.json` は次回dependency導入・更新時に実package managerで生成する
 
 未確認項目は確認済みとして扱いません。
