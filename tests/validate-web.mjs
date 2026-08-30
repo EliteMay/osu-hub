@@ -113,28 +113,42 @@ for (const marker of ['recoverySnapshot', 'verifyImported', 'replaceAllStores', 
 if (!/const\s+SCHEMA_VERSION\s*=\s*1\b/.test(storageSource)) fail('js/storage.js: SCHEMA_VERSION must be explicit.');
 
 const workerSource = read('cloudflare/worker/src/index.js');
-for (const marker of ['caches.default', 'SYNC_CACHE_TTL_SECONDS', 'Retry-After', 'HTMLRewriter', 'data-react="profile-page"', '/scores/recent']) {
-  if (!workerSource.includes(marker)) fail(`cloudflare/worker/src/index.js: missing public-sync guard ${marker}.`);
+for (const marker of ['caches.default', 'SYNC_CACHE_TTL_SECONDS', 'Retry-After', 'OSU_ACCESS_TOKEN', 'Authorization', 'Bearer', 'OSU_API_ORIGIN', '/scores/recent']) {
+  if (!workerSource.includes(marker)) fail(`cloudflare/worker/src/index.js: missing API v2 sync guard ${marker}.`);
 }
 if (!/SYNC_CACHE_TTL_SECONDS\s*=\s*60\b/.test(workerSource)) {
-  fail('Worker sync cache TTL must remain at least the documented one-minute polling interval.');
+  fail('Worker sync cache TTL must remain at the documented one-minute polling interval.');
 }
 if (!/response\.status\s*===\s*429/.test(workerSource)) {
   fail('Worker must handle upstream 429 responses explicitly.');
 }
-if (/OSU_CLIENT_SECRET|\/oauth\/token/.test(workerSource)) {
-  fail('Worker Account Sync must not depend on osu! OAuth Client Secret or /oauth/token.');
+if (!/response\.status\s*===\s*401/.test(workerSource)) {
+  fail('Worker must handle expired or invalid access tokens explicitly.');
 }
-if (!/upstreamMode:\s*['"]public-web['"]/.test(workerSource) || !/oauthRequired:\s*false/.test(workerSource)) {
-  fail('Worker health must identify the oauth-free public-web upstream mode.');
+if (/OSU_CLIENT_ID|OSU_CLIENT_SECRET|\/oauth\/token/.test(workerSource)) {
+  fail('Worker runtime must never contain osu! Client Credentials or call /oauth/token.');
+}
+if (!/upstreamMode:\s*['"]api-v2-preissued-token['"]/.test(workerSource)) {
+  fail('Worker health must identify api-v2-preissued-token upstream mode.');
+}
+if (!/browserOAuthRequired:\s*false/.test(workerSource) || !/tokenManagedBy:\s*['"]github-actions['"]/.test(workerSource)) {
+  fail('Worker health must identify browserOAuthRequired=false and GitHub Actions token management.');
 }
 
 const accountSyncSource = read('js/osu-sync.js');
-if (/Client ID\s*\/\s*Secret|API用Secret/.test(accountSyncSource)) {
-  fail('Account Sync UI still claims osu! OAuth secrets are required.');
+if (!/upstreamMode\s*!==\s*['"]api-v2-preissued-token['"]/.test(accountSyncSource)) {
+  fail('Account Sync UI must require the pre-issued-token API v2 Worker health mode.');
 }
-if (!/upstreamMode\s*!==\s*['"]public-web['"]/.test(accountSyncSource)) {
-  fail('Account Sync UI must reject the legacy OAuth Worker health response.');
+if (!/browserOAuthRequired\s*!==\s*false/.test(accountSyncSource) || !/tokenManagedBy\s*!==\s*['"]github-actions['"]/.test(accountSyncSource)) {
+  fail('Account Sync UI must verify browserOAuthRequired=false and GitHub Actions token management.');
+}
+
+const accountHtml = read('pages/account.html');
+if (!/ブラウザへのosu! Secret入力は不要/.test(accountHtml)) {
+  fail('Account Sync page must explain that browser secret input is not required.');
+}
+if (/id=["'](?:clientId|clientSecret|osuClientId|osuClientSecret)["']/i.test(accountHtml)) {
+  fail('Account Sync page must not expose Client ID / Secret input fields.');
 }
 
 const deployWorkflow = read('.github/workflows/deploy-worker.yml');
@@ -145,10 +159,32 @@ if (!/cloudflare\/worker\/\*\*/.test(deployWorkflow)) {
   fail('Worker deploy workflow must be path-scoped to cloudflare/worker/**.');
 }
 if (/OSU_CLIENT_ID|OSU_CLIENT_SECRET/.test(deployWorkflow)) {
-  fail('Worker deploy workflow must not require unused osu! OAuth secrets.');
+  fail('Normal Worker deploy workflow must not require osu! Client Credentials.');
 }
-if (!/upstreamMode[^\n]*public-web/.test(deployWorkflow) || !/oauthRequired[^\n]*false/.test(deployWorkflow)) {
-  fail('Worker deploy verification must assert public-web / oauthRequired=false health state.');
+if (!/upstreamMode[^\n]*api-v2-preissued-token/.test(deployWorkflow)) {
+  fail('Worker deploy verification must assert api-v2-preissued-token health state.');
+}
+if (!/browserOAuthRequired[^\n]*false/.test(deployWorkflow) || !/tokenManagedBy[^\n]*github-actions/.test(deployWorkflow)) {
+  fail('Worker deploy verification must assert browserOAuthRequired=false and tokenManagedBy=github-actions.');
+}
+if (!/\/api\/sync\?user=2&mode=osu&limit=1&include_fails=1/.test(deployWorkflow)) {
+  fail('Worker deploy workflow must run an end-to-end /api/sync smoke test.');
+}
+
+const refreshWorkflow = read('.github/workflows/refresh-osu-token.yml');
+for (const marker of ['OSU_CLIENT_ID', 'OSU_CLIENT_SECRET', 'OSU_ACCESS_TOKEN', 'https://osu.ppy.sh/oauth/token', '::add-mask::', 'https://osu.ppy.sh/api/v2/users/2/osu', 'secrets: |', '/api/sync?user=2&mode=osu&limit=1&include_fails=1']) {
+  if (!refreshWorkflow.includes(marker)) fail(`refresh-osu-token.yml: missing token lifecycle guard ${marker}.`);
+}
+if (!/cron:\s*["']17 \*\/12 \* \* \*["']/.test(refreshWorkflow)) {
+  fail('osu! token refresh workflow must run every 12 hours.');
+}
+if (!/tokenManagedBy[^\n]*github-actions/.test(refreshWorkflow) || !/upstreamMode[^\n]*api-v2-preissued-token/.test(refreshWorkflow)) {
+  fail('Token refresh workflow must verify the deployed Worker token-management mode.');
+}
+
+const checkWorkflow = read('.github/workflows/check-web.yml');
+if (!/\.github\/workflows\/refresh-osu-token\.yml/.test(checkWorkflow)) {
+  fail('Check web path filters must include refresh-osu-token.yml.');
 }
 
 const publicFiles = [
@@ -180,4 +216,4 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log(`Validated ${htmlFiles.length} HTML files, project metadata, versions, oauth-free Worker sync guards, deployment policy, stable runtime paths, import recovery guards, and responsive/accessibility/security rules: OK`);
+console.log(`Validated ${htmlFiles.length} HTML files, project metadata, versions, pre-issued-token API v2 sync guards, token refresh/deployment policy, stable runtime paths, import recovery guards, and responsive/accessibility/security rules: OK`);
