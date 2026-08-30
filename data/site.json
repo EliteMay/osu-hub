@@ -1,11 +1,11 @@
 {
-  "siteVersion": "0.2.1",
+  "siteVersion": "0.2.2",
   "name": "osu! Hub",
   "repository": "https://github.com/EliteMay/osu-hub",
   "pagesUrl": "https://elitemay.github.io/osu-hub/",
   "osuApi": {
     "provider": "Cloudflare Workers",
-    "workerUrl": "",
+    "workerUrl": "https://osu-hub-api.k12m45k.workers.dev",
     "syncLimit": 100,
     "includeFails": true,
     "requestTimeoutMs": 15000
