@@ -10,8 +10,26 @@ on:
       - "js/**"
       - "data/site.json"
       - "data/config.json"
+      - "project-meta.json"
       - "version.json"
+      - "package.json"
       - "cloudflare/worker/**"
+      - "tests/**"
+      - ".github/workflows/check-web.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "index.html"
+      - "pages/**"
+      - "css/**"
+      - "js/**"
+      - "data/site.json"
+      - "data/config.json"
+      - "project-meta.json"
+      - "version.json"
+      - "package.json"
+      - "cloudflare/worker/**"
+      - "tests/**"
       - ".github/workflows/check-web.yml"
   workflow_dispatch:
 
@@ -30,51 +48,29 @@ jobs:
           node --check js/storage.js
           node --check js/app.js
           node --check js/osu-sync.js
+          node --check js/site-meta.js
           node --check cloudflare/worker/src/index.js
+          node --check tests/validate-web.mjs
 
       - name: Check JSON
         run: |
           python -m json.tool data/site.json > /dev/null
           python -m json.tool data/config.json > /dev/null
+          python -m json.tool project-meta.json > /dev/null
           python -m json.tool version.json > /dev/null
+          python -m json.tool package.json > /dev/null
           python -m json.tool cloudflare/worker/package.json > /dev/null
 
-      - name: Check local HTML links
-        shell: python
+      - name: Validate web project
+        run: node tests/validate-web.mjs
+
+      - name: Check tracked secret files
+        shell: bash
         run: |
-          from html.parser import HTMLParser
-          from pathlib import Path
-          from urllib.parse import urlparse
-
-          root = Path('.')
-          html_files = [root / 'index.html', *sorted((root / 'pages').glob('*.html'))]
-          missing = []
-
-          class Parser(HTMLParser):
-              def __init__(self, base):
-                  super().__init__()
-                  self.base = base
-              def handle_starttag(self, tag, attrs):
-                  attrs = dict(attrs)
-                  for key in ('href', 'src'):
-                      value = attrs.get(key)
-                      if not value or value.startswith(('#', 'http://', 'https://', 'mailto:', 'data:')):
-                          continue
-                      clean = urlparse(value).path
-                      target = (self.base / clean).resolve()
-                      try:
-                          target.relative_to(root.resolve())
-                      except ValueError:
-                          continue
-                      if not target.exists():
-                          missing.append(f'{self.base}: {value}')
-
-          for file in html_files:
-              parser = Parser(file.parent)
-              parser.feed(file.read_text(encoding='utf-8'))
-
-          if missing:
-              print('Missing local links:')
-              print('\n'.join(missing))
-              raise SystemExit(1)
-          print(f'Checked {len(html_files)} HTML files: OK')
+          tracked="$(git ls-files | grep -E '(^|/)(\.env|\.dev\.vars)($|\.)' | grep -vE '\.example$' || true)"
+          if [ -n "$tracked" ]; then
+            echo "Tracked secret-like files detected:"
+            echo "$tracked"
+            exit 1
+          fi
+          echo "No tracked .env/.dev.vars secret files."
