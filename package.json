@@ -1,0 +1,46 @@
+{
+  "name": "osu-setup-launcher",
+  "version": "0.17.0",
+  "description": "osu!lazer 用の一括セットアップ起動Electronアプリ",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "start:safe": "electron .",
+    "build:win": "electron-builder --win nsis --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "local.osu.setup.launcher",
+    "productName": "osu Setup Launcher",
+    "asar": false,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "data/**/*",
+      "tools/**/*",
+      "package.json",
+      "README.md",
+      "作業報告書.md"
+    ],
+    "win": {
+      "target": [{"target":"nsis","arch":["x64"]}],
+      "artifactName": "osu_setup_${version}_setup.${ext}",
+      "signAndEditExecutable": false,
+      "forceCodeSigning": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "osu Setup Launcher"
+    },
+    "artifactName": "osu_setup_${version}_setup.${ext}"
+  },
+  "author": "EliteMay"
+}
