@@ -3,6 +3,7 @@
   const DB_VERSION = 1;
   const SCHEMA_VERSION = 1;
   const STORES = ['results', 'coaching', 'practice', 'settings'];
+  const MAX_RECORD_JSON_BYTES = 2_000_000;
   let dbPromise;
 
   const isRecord = (value) => value && typeof value === 'object' && !Array.isArray(value);
@@ -12,19 +13,43 @@
     return storeName === 'settings' ? row.key : row.id;
   }
 
+  function finiteInRange(value, min, max) {
+    if (value === null || value === undefined || value === '') return true;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= min && parsed <= max;
+  }
+
   function validateRow(storeName, row, index) {
     if (!isRecord(row)) throw new Error(`${storeName}[${index}] がObjectではありません。`);
     const value = cloneJson(row);
+    const serialized = JSON.stringify(value);
+    if (new Blob([serialized]).size > MAX_RECORD_JSON_BYTES) {
+      throw new Error(`${storeName}[${index}] が大きすぎます。`);
+    }
+
     const keyName = storeName === 'settings' ? 'key' : 'id';
     const key = String(value[keyName] ?? '').trim();
     if (!key || key.length > 200) throw new Error(`${storeName}[${index}] の${keyName}が不正です。`);
     value[keyName] = key;
 
-    if (storeName === 'results' && value.source === 'osu-api') {
-      const scoreId = String(value.osuScoreId ?? '').trim();
-      if (!/^\d+$/.test(scoreId)) throw new Error(`${storeName}[${index}] のosuScoreIdが不正です。`);
-      const expectedId = `osu:${scoreId}`;
-      if (value.id !== expectedId) throw new Error(`${storeName}[${index}] のScore IDが整合していません。`);
+    if (storeName === 'results') {
+      if (!finiteInRange(value.accuracy, 0, 100)) throw new Error(`${storeName}[${index}] のAccuracyが不正です。`);
+      if (!finiteInRange(value.miss, 0, Number.MAX_SAFE_INTEGER)) throw new Error(`${storeName}[${index}] のMissが不正です。`);
+      if (!finiteInRange(value.combo, 0, Number.MAX_SAFE_INTEGER)) throw new Error(`${storeName}[${index}] のComboが不正です。`);
+      if (!finiteInRange(value.pp, 0, Number.MAX_SAFE_INTEGER)) throw new Error(`${storeName}[${index}] のPPが不正です。`);
+      if (!finiteInRange(value.stars, 0, 100)) throw new Error(`${storeName}[${index}] のStar Ratingが不正です。`);
+      if (!finiteInRange(value.bpm, 0, 5000)) throw new Error(`${storeName}[${index}] のBPMが不正です。`);
+
+      if (value.source === 'osu-api') {
+        const scoreId = String(value.osuScoreId ?? '').trim();
+        if (!/^\d+$/.test(scoreId)) throw new Error(`${storeName}[${index}] のosuScoreIdが不正です。`);
+        const expectedId = `osu:${scoreId}`;
+        if (value.id !== expectedId) throw new Error(`${storeName}[${index}] のScore IDが整合していません。`);
+      }
+    }
+
+    if (storeName === 'practice' && !finiteInRange(value.minutes, 0, 24 * 60)) {
+      throw new Error(`${storeName}[${index}] のminutesが不正です。`);
     }
 
     return value;
@@ -34,6 +59,9 @@
     if (!isRecord(payload) || payload.schemaVersion !== SCHEMA_VERSION || !isRecord(payload.stores)) {
       throw new Error('対応していないバックアップ形式です。');
     }
+
+    const unexpectedStores = Object.keys(payload.stores).filter((name) => !STORES.includes(name));
+    if (unexpectedStores.length) throw new Error(`未対応Storeがあります: ${unexpectedStores.join(', ')}`);
 
     const prepared = {};
     for (const storeName of STORES) {
@@ -64,8 +92,14 @@
         });
       };
       req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error || new Error('IndexedDBを開けませんでした。'));
-      req.onblocked = () => reject(new Error('IndexedDB更新が他のタブによりブロックされています。'));
+      req.onerror = () => {
+        dbPromise = undefined;
+        reject(req.error || new Error('IndexedDBを開けませんでした。'));
+      };
+      req.onblocked = () => {
+        dbPromise = undefined;
+        reject(new Error('IndexedDB更新が他のタブによりブロックされています。'));
+      };
     });
     return dbPromise;
   }
@@ -134,16 +168,71 @@
     return data;
   }
 
-  async function importAll(payload, replace = false) {
-    const prepared = validateImportPayload(payload);
+  function stableValue(value) {
+    if (Array.isArray(value)) return value.map(stableValue);
+    if (isRecord(value)) {
+      return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stableValue(value[key])]));
+    }
+    return value;
+  }
+
+  function sameRecord(a, b) {
+    return JSON.stringify(stableValue(a)) === JSON.stringify(stableValue(b));
+  }
+
+  async function mergePrepared(prepared) {
     await writeTransaction(STORES, (transaction) => {
       for (const storeName of STORES) {
         const store = transaction.objectStore(storeName);
-        if (replace) store.clear();
         for (const row of prepared[storeName]) store.put(row);
       }
     });
-    return { imported: Object.fromEntries(STORES.map((name) => [name, prepared[name].length])) };
+  }
+
+  async function replaceAllStores(stores) {
+    await writeTransaction(STORES, (transaction) => {
+      for (const storeName of STORES) {
+        const store = transaction.objectStore(storeName);
+        store.clear();
+        for (const row of stores[storeName] || []) store.put(cloneJson(row));
+      }
+    });
+  }
+
+  async function verifyImported(prepared) {
+    for (const storeName of STORES) {
+      const current = await getAll(storeName);
+      const byKey = new Map(current.map((row) => [String(keyFor(storeName, row)), row]));
+      for (const expected of prepared[storeName]) {
+        const key = String(keyFor(storeName, expected));
+        const actual = byKey.get(key);
+        if (!actual || !sameRecord(actual, expected)) {
+          throw new Error(`${storeName} の読み戻し検証に失敗しました: ${key}`);
+        }
+      }
+    }
+  }
+
+  async function importAll(payload) {
+    const prepared = validateImportPayload(payload);
+    const recoverySnapshot = await exportAll();
+
+    try {
+      await mergePrepared(prepared);
+      await verifyImported(prepared);
+    } catch (error) {
+      try {
+        await replaceAllStores(recoverySnapshot.stores);
+      } catch (rollbackError) {
+        throw new Error(`Import失敗後のRollbackにも失敗しました: ${rollbackError.message || rollbackError}`);
+      }
+      throw new Error(`Importに失敗したため元データへRollbackしました: ${error.message || error}`);
+    }
+
+    return {
+      imported: Object.fromEntries(STORES.map((name) => [name, prepared[name].length])),
+      recoverySnapshot,
+    };
   }
 
   window.OsuDB = {
