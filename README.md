@@ -3,7 +3,7 @@
 osu!のプレイ記録、アカウント同期、AIコーチング、練習管理、統計、プレイヤー設定、Windows補助ツールをまとめる個人向けハブです。
 
 - Web: GitHub Pages
-- osu! API中継: Cloudflare Worker
+- osu!公開データ中継: Cloudflare Worker
 - Windows固有操作: Electron製 `osu Setup Launcher`
 - Webユーザーデータ: Browser IndexedDB
 
@@ -27,17 +27,17 @@ Web:
 https://elitemay.github.io/osu-hub/
 ```
 
-osu! API Worker:
+osu! Sync Worker:
 
 ```text
 https://osu-hub-api.k12m45k.workers.dev
 ```
 
-Worker URLは公開Endpointです。osu! Client SecretやCloudflare API Tokenは公開ファイルへ保存しません。
+Worker URLは公開Endpointです。Cloudflare API Token等の秘密情報は公開ファイルへ保存しません。
 
 ## Account Sync
 
-`pages/account.html` からCloudflare Worker経由でosu!api v2を利用します。
+`pages/account.html` からCloudflare Worker経由で、osu!の公開プロフィール情報とRecent Scoresを同期します。
 
 - osu! User IDまたはユーザー名
 - ruleset
@@ -45,20 +45,25 @@ Worker URLは公開Endpointです。osu! Client SecretやCloudflare API Tokenは
 - Failスコアを含める設定
 - `osu:<score id>` で重複整理
 - 手入力Resultsは削除しない
-- API同期Resultの手動メモは再同期で維持
+- 同期Resultの手動メモは再同期で維持
 - Browser timeout 15秒 / Worker upstream timeout 12秒
 - Worker ResponseをBrowser側でもValidation
 
-### Rate limit対策
+### OAuthを使わない同期方式
 
-osu!公式の利用方針に合わせ、APIを必要以上に再取得しません。
+Account Syncでは `OSU_CLIENT_ID` / `OSU_CLIENT_SECRET` を使用しません。
 
-- OAuth access tokenはWorkerのメモリ + Cloudflare Cache APIで有効期限まで再利用
-- 同一Isolateの同時Token取得は1回へ集約
-- 同じ同期条件は60秒キャッシュ
-- OAuth / APIの429は明示的に扱い、Retry-Afterがある場合は利用者へ返す
+従来はWorkerからClient Credentialsで `/oauth/token` を取得していましたが、実運用でosu! OAuth Token Endpointの429が継続しました。現在は、osu!の公開プロフィールページに埋め込まれた公開ユーザー情報と、osu!公式Web自身が利用する公開Recent Scores経路をWorkerから取得します。
 
-短時間に「今すぐ同期」を連打しても、同じユーザーのosu! API取得を毎回行わない設計です。
+これによりClient Secretを扱わず、OAuth Token EndpointのRate Limitにも依存しません。
+
+同じ `user / mode / limit / include_fails` 条件は60秒キャッシュし、短時間の連打で上流を毎回取得しない設計です。上流429では `Retry-After` があれば利用者へ返します。
+
+### 外部仕様への依存
+
+公開Recent Scores経路とプロフィールHTMLはosu! Web実装への依存です。osu!側でRouteや `data-initial-data` の構造が変更された場合はWorkerの追従が必要です。
+
+このためWorkerではResponse Validationを行い、想定形式でなければ既存Localデータを壊さずErrorとして返します。
 
 ## Cloudflare Worker
 
@@ -73,16 +78,16 @@ cloudflare/worker/
 └─ README.md
 ```
 
-Repository Secrets:
+GitHub Actionsで必要なRepository Secrets:
 
 ```text
 CLOUDFLARE_ACCOUNT_ID
 CLOUDFLARE_API_TOKEN
-OSU_CLIENT_ID
-OSU_CLIENT_SECRET
 ```
 
-`Deploy osu Hub API Worker` は手動実行に加え、mainの `cloudflare/worker/**` またはdeploy workflow変更時にも自動deployします。deploy後は `/health` でWorker稼働とSecret設定状態を確認します。
+`Deploy osu Hub API Worker` は手動実行に加え、mainの `cloudflare/worker/**` またはdeploy workflow変更時にも自動deployします。deploy後は `/health` で `upstreamMode: public-web` と `oauthRequired: false` を検証します。
+
+以前登録したosu! Client ID / SecretがGitHubまたはCloudflare側に残っていても、現行Account Sync Workerは参照しません。
 
 ## AI Coaching
 
@@ -96,7 +101,7 @@ AI返却JSONはValidation後に保存します。JSZip CDNが利用できない�
 
 ## Results / Stats / Practice / Settings
 
-- Results: API同期 + 手入力履歴
+- Results: osu!同期 + 手入力履歴
 - Stats: 平均ACC、平均Miss、最高PP、直近ACC、MOD別集計
 - Practice: 練習内容・時間・完了管理
 - Settings: DPI、感度、Tablet Area、JSON Backup / Import
@@ -129,22 +134,23 @@ Windows固有処理は実Windowsで未確認の項目を確認済み扱いしま
 
 Pages ArtifactはWebファイルだけを公開します。Cloudflare Workerソース、Electronソース、bat、Secretファイルは含めません。
 
-`tests/validate-web.mjs` / `Check web` では、JS/JSON/HTML、Version、Project Profile、Secret混入、Import Recovery、Worker HTTPS/timeout、OAuth rate-limit guard、Worker CD設定などを確認します。
+`tests/validate-web.mjs` / `Check web` では、JS/JSON/HTML、Version、Project Profile、Secret混入、Import Recovery、Worker HTTPS/timeout、公開プロフィール同期経路、60秒Cache、429処理、Worker CD設定などを確認します。
 
 ## 崩してはいけない仕様
 
 - Secretを公開コードへ入れない
 - 個人プレイデータをGitHubへ自動送信しない
-- 手入力ResultsをAPI同期で削除しない
+- 手入力Resultsを同期で削除しない
 - 同一osu! Score IDの重複を増やさない
 - IndexedDBとJSON Backup / Importを維持する
-- API停止時もLocal機能を使えるようにする
+- 外部同期停止時もLocal機能を使えるようにする
 - AI Coachingに有料APIを必須化しない
 - Electron Launcherを削除しない
+- 公開Web同期経路の形式が変わった場合に不正データを保存しない
 
 ## 未確認 / 今後
 
-- OAuth 429修正後の実osu!アカウントRecent Scores同期
+- Web 0.2.4公開後の実osu!アカウントRecent Scores同期
 - Account Sync → Results → Statsの実ブラウザE2E
 - Backup / Import / Rollbackの実ブラウザE2E
 - Recent Scoresの過去全履歴ページング同期
