@@ -6,15 +6,16 @@ Web Versionの正本は `data/site.json` の `siteVersion` です。Desktop Laun
 
 ### Changed
 
-- `web-project-guide` 1.1.1 に合わせてProject Profile / Source of Truthを記録
+- `web-project-guide` 1.2.0 に合わせてProject Profile / Source of Truth / Stable Runtime方針を記録
 - Mobile Navigationを非表示から横Scroll方式へ変更
 - Web Version表示を `data/site.json` から反映する構成へ統一
 - Account Sync未設定状態を `SETUP REQUIRED` として明示
-- Backup Importを事前Validation + atomic transactionへ変更
+- Backup Importを全Payload Validation → Recovery Snapshot → atomic transaction → Read-back Verification → Rollback対応へ変更
 - Worker / Browserの外部通信timeoutとResponse Validationを追加
 - AI Coaching返却JSONのSchema Validationを追加
 - Form label、focus-visible、reduced-motion等のAccessibilityを改善
 - 削除・保存・Import失敗時のFeedbackを強化
+- Version付きRuntime Path / MutationObserver DOM Patch再混入をCIで検出
 - PR / mainの両方でFinal-state Validationを実行するCIへ更新
 
 ### Added
@@ -27,6 +28,7 @@ Web Versionの正本は `data/site.json` の `siteVersion` です。Desktop Laun
 
 - Cloudflare Worker本番deploy
 - 実osu!アカウント同期
+- Backup / Import / Rollbackの実ブラウザE2E
 - 今回変更後のFirefox / Chromium実ブラウザE2E
 - Windows固有Desktop Launcher動作
 
