@@ -11,6 +11,7 @@ on:
       - "data/site.json"
       - "data/config.json"
       - "version.json"
+      - "cloudflare/worker/**"
       - ".github/workflows/check-web.yml"
   workflow_dispatch:
 
@@ -28,12 +29,15 @@ jobs:
         run: |
           node --check js/storage.js
           node --check js/app.js
+          node --check js/osu-sync.js
+          node --check cloudflare/worker/src/index.js
 
       - name: Check JSON
         run: |
           python -m json.tool data/site.json > /dev/null
           python -m json.tool data/config.json > /dev/null
           python -m json.tool version.json > /dev/null
+          python -m json.tool cloudflare/worker/package.json > /dev/null
 
       - name: Check local HTML links
         shell: python
