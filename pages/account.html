@@ -63,11 +63,10 @@
         </div>
         <div class="field">
           <label>Failしたプレイ</label>
-          <select id="includeFailsSelect" aria-label="Failしたプレイの取得設定">
+          <select id="includeFails" name="includeFails">
             <option value="1">含める</option>
             <option value="0">含めない</option>
           </select>
-          <input id="includeFails" name="includeFails" type="checkbox" checked class="hidden">
         </div>
         <div class="field full">
           <div class="actions">
@@ -107,13 +106,5 @@
 <footer class="footer"><span>osu! Hub v0.2.0</span><span>osu! API credentials stay on Cloudflare.</span></footer>
 <script src="../js/storage.js"></script>
 <script src="../js/osu-sync.js"></script>
-<script>
-  const select = document.getElementById('includeFailsSelect');
-  const checkbox = document.getElementById('includeFails');
-  const syncSelect = () => { checkbox.checked = select.value === '1'; };
-  select.addEventListener('change', syncSelect);
-  const observer = new MutationObserver(() => { select.value = checkbox.checked ? '1' : '0'; });
-  observer.observe(checkbox, { attributes: true, attributeFilter: ['checked'] });
-</script>
 </body>
 </html>
