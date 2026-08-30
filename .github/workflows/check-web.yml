@@ -1,0 +1,76 @@
+name: Check web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "index.html"
+      - "pages/**"
+      - "css/**"
+      - "js/**"
+      - "data/site.json"
+      - "data/config.json"
+      - "version.json"
+      - ".github/workflows/check-web.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check JavaScript syntax
+        run: |
+          node --check js/storage.js
+          node --check js/app.js
+
+      - name: Check JSON
+        run: |
+          python -m json.tool data/site.json > /dev/null
+          python -m json.tool data/config.json > /dev/null
+          python -m json.tool version.json > /dev/null
+
+      - name: Check local HTML links
+        shell: python
+        run: |
+          from html.parser import HTMLParser
+          from pathlib import Path
+          from urllib.parse import urlparse
+
+          root = Path('.')
+          html_files = [root / 'index.html', *sorted((root / 'pages').glob('*.html'))]
+          missing = []
+
+          class Parser(HTMLParser):
+              def __init__(self, base):
+                  super().__init__()
+                  self.base = base
+              def handle_starttag(self, tag, attrs):
+                  attrs = dict(attrs)
+                  for key in ('href', 'src'):
+                      value = attrs.get(key)
+                      if not value or value.startswith(('#', 'http://', 'https://', 'mailto:', 'data:')):
+                          continue
+                      clean = urlparse(value).path
+                      target = (self.base / clean).resolve()
+                      try:
+                          target.relative_to(root.resolve())
+                      except ValueError:
+                          continue
+                      if not target.exists():
+                          missing.append(f'{self.base}: {value}')
+
+          for file in html_files:
+              parser = Parser(file.parent)
+              parser.feed(file.read_text(encoding='utf-8'))
+
+          if missing:
+              print('Missing local links:')
+              print('\n'.join(missing))
+              raise SystemExit(1)
+          print(f'Checked {len(html_files)} HTML files: OK')
