@@ -112,6 +112,25 @@ for (const marker of ['recoverySnapshot', 'verifyImported', 'replaceAllStores', 
 }
 if (!/const\s+SCHEMA_VERSION\s*=\s*1\b/.test(storageSource)) fail('js/storage.js: SCHEMA_VERSION must be explicit.');
 
+const workerSource = read('cloudflare/worker/src/index.js');
+for (const marker of ['caches.default', 'tokenRefreshPromise', 'SYNC_CACHE_TTL_SECONDS', 'Retry-After']) {
+  if (!workerSource.includes(marker)) fail(`cloudflare/worker/src/index.js: missing rate-limit guard ${marker}.`);
+}
+if (!/SYNC_CACHE_TTL_SECONDS\s*=\s*60\b/.test(workerSource)) {
+  fail('Worker sync cache TTL must remain at least the documented one-minute polling interval.');
+}
+if (!/response\.status\s*===\s*429/.test(workerSource)) {
+  fail('Worker must handle upstream 429 responses explicitly.');
+}
+
+const deployWorkflow = read('.github/workflows/deploy-worker.yml');
+if (!/push:\s*[\s\S]*branches:\s*[\s\S]*main/.test(deployWorkflow)) {
+  fail('Worker deploy workflow must continuously deploy Worker changes from main.');
+}
+if (!/cloudflare\/worker\/\*\*/.test(deployWorkflow)) {
+  fail('Worker deploy workflow must be path-scoped to cloudflare/worker/**.');
+}
+
 const publicFiles = [
   'index.html',
   ...htmlFiles.filter((file) => file !== 'index.html'),
@@ -141,4 +160,4 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log(`Validated ${htmlFiles.length} HTML files, project metadata, versions, stable runtime paths, import recovery guards, and responsive/accessibility/security rules: OK`);
+console.log(`Validated ${htmlFiles.length} HTML files, project metadata, versions, Worker rate-limit guards, deployment policy, stable runtime paths, import recovery guards, and responsive/accessibility/security rules: OK`);

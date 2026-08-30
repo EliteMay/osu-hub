@@ -2,6 +2,12 @@ name: Deploy osu Hub API Worker
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "cloudflare/worker/**"
+      - ".github/workflows/deploy-worker.yml"
 
 permissions:
   contents: read
@@ -88,4 +94,5 @@ jobs:
             echo "- URL: ${DEPLOYMENT_URL}"
             echo "- /health: OK"
             echo "- osu! OAuth secrets: configured"
+            echo "- Trigger: ${GITHUB_EVENT_NAME}"
           } >> "$GITHUB_STEP_SUMMARY"
