@@ -17,16 +17,20 @@ Web Versionの正本は `data/site.json` の `siteVersion` です。Desktop Laun
 - 削除・保存・Import失敗時のFeedbackを強化
 - Version付きRuntime Path / MutationObserver DOM Patch再混入をCIで検出
 - PR / mainの両方でFinal-state Validationを実行するCIへ更新
+- Cloudflare Workerの本番deployをGitHub Actionsから手動実行できる経路を追加
+- Worker deploy後に `/health` とosu! OAuth Secret設定状態を自動検証する構成を追加
 
 ### Added
 
 - `project-meta.json`
 - `js/site-meta.js`
 - `tests/validate-web.mjs`
+- `.github/workflows/deploy-worker.yml`
 
 ### Unverified
 
 - Cloudflare Worker本番deploy
+- GitHub Repository Secretsの本番設定
 - 実osu!アカウント同期
 - Backup / Import / Rollbackの実ブラウザE2E
 - 今回変更後のFirefox / Chromium実ブラウザE2E
