@@ -113,14 +113,28 @@ for (const marker of ['recoverySnapshot', 'verifyImported', 'replaceAllStores', 
 if (!/const\s+SCHEMA_VERSION\s*=\s*1\b/.test(storageSource)) fail('js/storage.js: SCHEMA_VERSION must be explicit.');
 
 const workerSource = read('cloudflare/worker/src/index.js');
-for (const marker of ['caches.default', 'tokenRefreshPromise', 'SYNC_CACHE_TTL_SECONDS', 'Retry-After']) {
-  if (!workerSource.includes(marker)) fail(`cloudflare/worker/src/index.js: missing rate-limit guard ${marker}.`);
+for (const marker of ['caches.default', 'SYNC_CACHE_TTL_SECONDS', 'Retry-After', 'HTMLRewriter', 'data-react="profile-page"', '/scores/recent']) {
+  if (!workerSource.includes(marker)) fail(`cloudflare/worker/src/index.js: missing public-sync guard ${marker}.`);
 }
 if (!/SYNC_CACHE_TTL_SECONDS\s*=\s*60\b/.test(workerSource)) {
   fail('Worker sync cache TTL must remain at least the documented one-minute polling interval.');
 }
 if (!/response\.status\s*===\s*429/.test(workerSource)) {
   fail('Worker must handle upstream 429 responses explicitly.');
+}
+if (/OSU_CLIENT_SECRET|\/oauth\/token/.test(workerSource)) {
+  fail('Worker Account Sync must not depend on osu! OAuth Client Secret or /oauth/token.');
+}
+if (!/upstreamMode:\s*['"]public-web['"]/.test(workerSource) || !/oauthRequired:\s*false/.test(workerSource)) {
+  fail('Worker health must identify the oauth-free public-web upstream mode.');
+}
+
+const accountSyncSource = read('js/osu-sync.js');
+if (/Client ID\s*\/\s*Secret|API用Secret/.test(accountSyncSource)) {
+  fail('Account Sync UI still claims osu! OAuth secrets are required.');
+}
+if (!/upstreamMode\s*!==\s*['"]public-web['"]/.test(accountSyncSource)) {
+  fail('Account Sync UI must reject the legacy OAuth Worker health response.');
 }
 
 const deployWorkflow = read('.github/workflows/deploy-worker.yml');
@@ -129,6 +143,12 @@ if (!/push:\s*[\s\S]*branches:\s*[\s\S]*main/.test(deployWorkflow)) {
 }
 if (!/cloudflare\/worker\/\*\*/.test(deployWorkflow)) {
   fail('Worker deploy workflow must be path-scoped to cloudflare/worker/**.');
+}
+if (/OSU_CLIENT_ID|OSU_CLIENT_SECRET/.test(deployWorkflow)) {
+  fail('Worker deploy workflow must not require unused osu! OAuth secrets.');
+}
+if (!/upstreamMode[^\n]*public-web/.test(deployWorkflow) || !/oauthRequired[^\n]*false/.test(deployWorkflow)) {
+  fail('Worker deploy verification must assert public-web / oauthRequired=false health state.');
 }
 
 const publicFiles = [
@@ -160,4 +180,4 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log(`Validated ${htmlFiles.length} HTML files, project metadata, versions, Worker rate-limit guards, deployment policy, stable runtime paths, import recovery guards, and responsive/accessibility/security rules: OK`);
+console.log(`Validated ${htmlFiles.length} HTML files, project metadata, versions, oauth-free Worker sync guards, deployment policy, stable runtime paths, import recovery guards, and responsive/accessibility/security rules: OK`);
