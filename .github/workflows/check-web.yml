@@ -16,6 +16,7 @@ on:
       - "cloudflare/worker/**"
       - "tests/**"
       - ".github/workflows/check-web.yml"
+      - ".github/workflows/deploy-worker.yml"
   pull_request:
     branches: [main]
     paths:
@@ -31,6 +32,7 @@ on:
       - "cloudflare/worker/**"
       - "tests/**"
       - ".github/workflows/check-web.yml"
+      - ".github/workflows/deploy-worker.yml"
   workflow_dispatch:
 
 permissions:
