@@ -1,27 +1,71 @@
 <!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AI Coaching | osu! Hub</title><link rel="stylesheet" href="../css/styles.css"></head>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="osu!の複数リザルト画像をChatGPTへ渡すためのAIコーチング提出データを作成。">
+  <title>AI Coaching | osu! Hub</title>
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
 <body data-page="coaching">
-<header class="topbar"><a class="brand" href="../index.html"><span class="brand-mark">osu!</span><span>Hub</span></a><nav class="nav"><a href="./account.html">Account Sync</a><a href="./coaching.html">AI Coach</a><a href="./results.html">Results</a><a href="./practice.html">Practice</a><a href="./stats.html">Stats</a><a href="./settings.html">Settings</a><a href="./tools.html">Desktop Tools</a></nav></header>
+<header class="topbar">
+  <a class="brand" href="../index.html"><span class="brand-mark">osu!</span><span>Hub</span></a>
+  <nav class="nav" aria-label="メインナビゲーション">
+    <a href="./account.html">Account Sync</a>
+    <a href="./coaching.html">AI Coach</a>
+    <a href="./results.html">Results</a>
+    <a href="./practice.html">Practice</a>
+    <a href="./stats.html">Stats</a>
+    <a href="./settings.html">Settings</a>
+    <a href="./tools.html">Desktop Tools</a>
+  </nav>
+</header>
 <main class="container">
-<section class="page-head"><div><p class="eyebrow">core feature</p><h1>AI Coaching</h1><p class="lead">リザルト画像をまとめて、ChatGPTが読みやすい提出ZIPを作る。APIキーは不要。</p></div><div class="callout"><strong>画像 <span id="imageCount">0</span> 枚</strong><p>ZIPに画像・manifest・分析指示をまとめます。</p></div></section>
+<section class="page-head">
+  <div><p class="eyebrow">core feature</p><h1>AI Coaching</h1><p class="lead">リザルト画像をまとめて、ChatGPTが読みやすい提出ZIPを作る。APIキーは不要。</p></div>
+  <div class="callout"><strong>画像 <span id="imageCount">0</span> 枚</strong><p>ZIPに画像・manifest・分析指示をまとめます。</p></div>
+</section>
 <div class="split">
 <section class="stack">
-  <div class="panel flat"><div class="panel-title"><div><p class="eyebrow">step 1</p><h2>セッション情報</h2></div></div><div class="form-grid">
-    <div class="field"><label for="coachTitle">セッション名</label><input id="coachTitle" placeholder="例: 高BPM Aim練習"></div>
-    <div class="field"><label for="coachDate">日付</label><input id="coachDate" type="date"></div>
-    <div class="field full"><label for="coachGoal">今日意識したこと / 練習目的</label><input id="coachGoal" placeholder="例: フリック後の微調整を焦らない"></div>
-    <div class="field full"><label for="coachNote">自分で感じた問題</label><textarea id="coachNote" placeholder="例: 後半で腕が固くなってAccuracyが落ちた気がする"></textarea></div>
-  </div></div>
-  <div class="panel flat"><div class="panel-title"><div><p class="eyebrow">step 2</p><h2>リザルト画像</h2></div><a href="./account.html">osu! API同期 →</a></div><div id="dropzone" class="dropzone"><div><strong>ここに画像をまとめてドロップ</strong><p>クリックして複数選択も可能。PNG / JPG / WebPなど。</p></div><input id="resultImages" type="file" accept="image/*" multiple></div><div id="imagePreview" class="preview-grid"></div></div>
-  <div class="panel flat"><div class="panel-title"><div><p class="eyebrow">step 3</p><h2>ChatGPT提出用を作成</h2></div></div><p class="muted">ZIPには画像、<code>prompt.txt</code>、<code>coaching_manifest.json</code>、<code>notes.txt</code>を入れます。ZIP生成にはJSZipをCDNから読み込みます。</p><div class="actions"><button id="buildCoachZip" class="button primary">提出ZIPを作成</button></div></div>
+  <div class="panel flat">
+    <div class="panel-title"><div><p class="eyebrow">step 1</p><h2>セッション情報</h2></div></div>
+    <div class="form-grid">
+      <div class="field"><label for="coachTitle">セッション名</label><input id="coachTitle" placeholder="例: 高BPM Aim練習"></div>
+      <div class="field"><label for="coachDate">日付</label><input id="coachDate" type="date"></div>
+      <div class="field full"><label for="coachGoal">今日意識したこと / 練習目的</label><input id="coachGoal" placeholder="例: フリック後の微調整を焦らない"></div>
+      <div class="field full"><label for="coachNote">自分で感じた問題</label><textarea id="coachNote" placeholder="例: 後半で腕が固くなってAccuracyが落ちた気がする"></textarea></div>
+    </div>
+  </div>
+  <div class="panel flat">
+    <div class="panel-title"><div><p class="eyebrow">step 2</p><h2>リザルト画像</h2></div><a href="./account.html">osu! API同期 →</a></div>
+    <button id="dropzone" class="dropzone" type="button" aria-describedby="dropHelp">
+      <span><strong>ここに画像をまとめてドロップ</strong><span id="dropHelp" class="muted">クリックして複数選択も可能。PNG / JPG / WebPなど。1枚20MBまで、最大100枚。</span></span>
+    </button>
+    <input id="resultImages" class="hidden-file" type="file" accept="image/*" multiple>
+    <div id="imagePreview" class="preview-grid" aria-live="polite"></div>
+  </div>
+  <div class="panel flat">
+    <div class="panel-title"><div><p class="eyebrow">step 3</p><h2>ChatGPT提出用を作成</h2></div></div>
+    <p class="muted">ZIPには画像、<code>prompt.txt</code>、<code>coaching_manifest.json</code>、<code>notes.txt</code>を入れます。JSZipを読み込めない場合はJSON/TXTへFallbackします。</p>
+    <div class="actions"><button id="buildCoachZip" class="button primary" type="button">提出ZIPを作成</button></div>
+  </div>
 </section>
 <aside class="stack">
-  <div class="panel flat"><p class="eyebrow">response</p><h2>AI分析を戻す</h2><p class="muted">ChatGPTが返したJSONを貼るか、JSONファイルを選択。</p><div class="field"><label for="analysisJson">分析JSON</label><textarea id="analysisJson" placeholder='{"schemaVersion":1,"summary":"..."}'></textarea></div><div class="field"><label for="analysisFile">JSONファイル</label><input id="analysisFile" type="file" accept="application/json,.json"></div><div class="actions"><button id="importAnalysis" class="button primary">分析結果を保存</button></div></div>
+  <div class="panel flat">
+    <p class="eyebrow">response</p><h2>AI分析を戻す</h2><p class="muted">ChatGPTが返したJSONを貼るか、JSONファイルを選択。Schema v1を検証してから保存します。</p>
+    <div class="field"><label for="analysisJson">分析JSON</label><textarea id="analysisJson" placeholder='{"schemaVersion":1,"summary":"..."}'></textarea></div>
+    <div class="field"><label for="analysisFile">JSONファイル</label><input id="analysisFile" type="file" accept="application/json,.json"></div>
+    <div class="actions"><button id="importAnalysis" class="button primary" type="button">分析結果を検証して保存</button></div>
+  </div>
   <div class="panel flat"><p class="eyebrow">latest analysis</p><h2>最新の分析</h2><div id="analysisPreview" class="list-empty">まだ分析結果がありません。</div></div>
 </aside>
 </div>
 <section class="panel"><div class="panel-title"><div><p class="eyebrow">history</p><h2>コーチング履歴</h2></div></div><div id="coachHistory" class="list-empty">まだ履歴がありません。</div></section>
 </main>
-<footer class="footer"><span>osu! Hub v0.2.0</span><span>AIへの送信はユーザー自身が行います。</span></footer>
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script><script src="../js/storage.js"></script><script src="../js/app.js"></script>
-</body></html>
+<footer class="footer"><span>osu! Hub <strong data-site-version></strong></span><span>AIへの送信はユーザー自身が行います。</span></footer>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="../js/storage.js"></script>
+<script src="../js/app.js"></script>
+<script src="../js/site-meta.js"></script>
+</body>
+</html>

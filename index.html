@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#17131f">
+  <meta name="description" content="osu!のリザルト同期、AIコーチング、練習管理、統計、設定、Desktop Toolsをまとめた個人向けHub。">
   <title>osu! Hub</title>
   <link rel="stylesheet" href="./css/styles.css">
 </head>
@@ -28,12 +29,12 @@
         <h1>プレイ・分析・練習・環境構築を、ここにまとめる。</h1>
         <p class="lead">osu!アカウントからのリザルト同期、大量データをChatGPTへ渡すAIコーチング、成長記録、練習管理、設定保存、Setup Launcher配布までを1つにまとめたosu!用ハブ。</p>
         <div class="hero-actions">
-          <a class="button primary" href="./pages/account.html">osu!アカウントを同期</a>
+          <a class="button primary" href="./pages/account.html">Account Syncを設定</a>
           <a class="button ghost" href="./pages/coaching.html">AIコーチング</a>
         </div>
       </div>
       <div class="hero-panel">
-        <div class="status-dot"></div>
+        <div class="status-dot" aria-hidden="true"></div>
         <strong>Local-first + safe API relay</strong>
         <p>プレイデータはブラウザのIndexedDBへ保存。osu! Client SecretはCloudflare Worker側だけで管理。</p>
       </div>
@@ -52,23 +53,29 @@
     </section>
 
     <section class="feature-grid">
-      <a class="feature-card featured" href="./pages/account.html"><span class="badge">NEW</span><h3>Account Sync</h3><p>Cloudflare Worker経由でRecent Scoresを最大100件取得。Failも含め、重複を整理してResultsへ保存。</p><span class="card-link">同期する →</span></a>
-      <a class="feature-card featured" href="./pages/coaching.html"><span class="badge">CORE</span><h3>AI Coaching</h3><p>複数のリザルト画像とメモをまとめてChatGPT提出用ZIPにする。返却JSONも保存可能。</p><span class="card-link">開く →</span></a>
+      <a class="feature-card featured" href="./pages/account.html">
+        <span class="badge" data-account-sync-badge>SETUP REQUIRED</span>
+        <h3>Account Sync</h3>
+        <p>Cloudflare Worker経由でRecent Scoresを最大100件取得。Worker設定前はセットアップ画面として表示。</p>
+        <span class="card-link" data-account-sync-cta>設定する →</span>
+      </a>
+      <a class="feature-card featured" href="./pages/coaching.html"><span class="badge">CORE</span><h3>AI Coaching</h3><p>複数のリザルト画像とメモをまとめてChatGPT提出用ZIPにする。返却JSONもSchema検証して保存。</p><span class="card-link">開く →</span></a>
       <a class="feature-card" href="./pages/results.html"><h3>Results</h3><p>API同期または手入力でACC・Miss・Combo・PP・★・BPM・MODを保存し、後から比較できる。</p><span class="card-link">開く →</span></a>
       <a class="feature-card" href="./pages/stats.html"><h3>Stats</h3><p>保存したリザルトから平均ACC、PP、Miss傾向などを軽量なグラフで確認。</p><span class="card-link">開く →</span></a>
       <a class="feature-card" href="./pages/practice.html"><h3>Practice</h3><p>今日の練習内容、目標、完了状況を管理する。</p><span class="card-link">開く →</span></a>
-      <a class="feature-card" href="./pages/settings.html"><h3>Player Settings</h3><p>DPI、感度、タブレットArea、メモを保存。バックアップもここから行う。</p><span class="card-link">開く →</span></a>
+      <a class="feature-card" href="./pages/settings.html"><h3>Player Settings</h3><p>DPI、感度、タブレットArea、メモを保存。検証付きJSONバックアップもここから行う。</p><span class="card-link">開く →</span></a>
       <a class="feature-card" href="./pages/tools.html"><h3>Desktop Tools</h3><p>音声切替、OpenTabletDriver、遅延対策、osu!lazerをまとめて起動するSetup Launcher。</p><span class="card-link">開く →</span></a>
     </section>
 
     <section class="panel recent-panel">
       <div class="panel-title"><div><p class="eyebrow">recent</p><h2>最近のリザルト</h2></div><a href="./pages/results.html">すべて見る</a></div>
-      <div id="homeRecentResults" class="list-empty">まだリザルトがありません。</div>
+      <div id="homeRecentResults" class="list-empty">まだリザルトがありません。Account SyncまたはResultsから追加できます。</div>
     </section>
   </main>
 
-  <footer class="footer"><span>osu! Hub <strong data-site-version>v0.2.0</strong></span><span>Secrets stay out of GitHub Pages.</span></footer>
+  <footer class="footer"><span>osu! Hub <strong data-site-version></strong></span><span>Secrets stay out of GitHub Pages.</span></footer>
   <script src="./js/storage.js"></script>
   <script src="./js/app.js"></script>
+  <script src="./js/site-meta.js"></script>
 </body>
 </html>

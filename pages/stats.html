@@ -1,11 +1,26 @@
 <!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Stats | osu! Hub</title><link rel="stylesheet" href="../css/styles.css"></head>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="osu! Hubに保存したResultsからAccuracy、Miss、PP、MOD別傾向を確認するStats画面。">
+  <title>Stats | osu! Hub</title>
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
 <body data-page="stats">
-<header class="topbar"><a class="brand" href="../index.html"><span class="brand-mark">osu!</span><span>Hub</span></a><nav class="nav"><a href="./account.html">Account Sync</a><a href="./coaching.html">AI Coach</a><a href="./results.html">Results</a><a href="./practice.html">Practice</a><a href="./stats.html">Stats</a><a href="./settings.html">Settings</a><a href="./tools.html">Desktop Tools</a></nav></header>
-<main class="container"><section class="page-head"><div><p class="eyebrow">progress</p><h1>Stats</h1><p class="lead">手入力とosu! API同期のResultsをまとめて、成長の変化を軽量に確認。</p></div><a class="button ghost" href="./account.html">最新リザルトを同期</a></section>
-<section class="metric-grid"><article class="metric"><span>Results</span><strong id="statsResultCount">0</strong><small>分析対象</small></article><article class="metric"><span>Average ACC</span><strong id="statsAvgAcc">--</strong><small>全登録分</small></article><article class="metric"><span>Average Miss</span><strong id="statsAvgMiss">--</strong><small>1プレイ平均</small></article><article class="metric"><span>Best PP</span><strong id="statsBestPP">--</strong><small>登録分の最高</small></article></section>
-<div id="statsEmpty" class="notice hidden">統計を表示するにはResultsを追加するかAccount Syncを実行してください。</div>
-<section class="panel"><div class="panel-title"><div><p class="eyebrow">recent accuracy</p><h2>直近20件のAccuracy</h2></div></div><div id="accChart" class="chart"></div></section>
+<header class="topbar">
+  <a class="brand" href="../index.html"><span class="brand-mark">osu!</span><span>Hub</span></a>
+  <nav class="nav" aria-label="メインナビゲーション"><a href="./account.html">Account Sync</a><a href="./coaching.html">AI Coach</a><a href="./results.html">Results</a><a href="./practice.html">Practice</a><a href="./stats.html">Stats</a><a href="./settings.html">Settings</a><a href="./tools.html">Desktop Tools</a></nav>
+</header>
+<main class="container">
+<section class="page-head"><div><p class="eyebrow">progress</p><h1>Stats</h1><p class="lead">手入力とosu! API同期のResultsをまとめて、成長の変化を軽量に確認。</p></div><a class="button ghost" href="./account.html">最新リザルトを同期</a></section>
+<section class="metric-grid" aria-label="統計概要"><article class="metric"><span>Results</span><strong id="statsResultCount">0</strong><small>分析対象</small></article><article class="metric"><span>Average ACC</span><strong id="statsAvgAcc">--</strong><small>全登録分</small></article><article class="metric"><span>Average Miss</span><strong id="statsAvgMiss">--</strong><small>1プレイ平均</small></article><article class="metric"><span>Best PP</span><strong id="statsBestPP">--</strong><small>登録分の最高</small></article></section>
+<div id="statsEmpty" class="notice hidden" role="status">統計を表示するにはResultsを追加するかAccount Syncを実行してください。</div>
+<section class="panel"><div class="panel-title"><div><p class="eyebrow">recent accuracy</p><h2>直近20件のAccuracy</h2></div></div><div id="accChart" class="chart" aria-label="直近Accuracy一覧"></div></section>
 <section class="panel"><div class="panel-title"><div><p class="eyebrow">mods</p><h2>MOD別</h2></div></div><div id="modStats" class="data-list"></div></section>
-<section class="panel flat"><p class="eyebrow">next</p><h2>今後追加する分析</h2><div class="pill-list"><span class="pill">BPM別ACC</span><span class="pill">★別Miss</span><span class="pill">Session比較</span><span class="pill">Aim / Stream分類</span><span class="pill">PP推移</span><span class="pill">AI Coach履歴との比較</span></div></section>
-</main><footer class="footer"><span>osu! Hub v0.2.0</span><span>外部チャートライブラリなし。</span></footer><script src="../js/storage.js"></script><script src="../js/app.js"></script></body></html>
+<section class="panel flat"><p class="eyebrow">planned</p><h2>開発予定の分析</h2><p class="muted">以下はまだ統計ロジック未実装です。</p><div class="pill-list"><span class="pill">BPM別ACC</span><span class="pill">★別Miss</span><span class="pill">Session比較</span><span class="pill">Aim / Stream分類</span><span class="pill">PP推移</span><span class="pill">AI Coach履歴との比較</span></div></section>
+</main>
+<footer class="footer"><span>osu! Hub <strong data-site-version></strong></span><span>外部チャートライブラリなし。</span></footer>
+<script src="../js/storage.js"></script><script src="../js/app.js"></script><script src="../js/site-meta.js"></script>
+</body>
+</html>

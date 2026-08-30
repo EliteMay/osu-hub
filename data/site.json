@@ -1,5 +1,5 @@
 {
-  "siteVersion": "0.2.0",
+  "siteVersion": "0.2.1",
   "name": "osu! Hub",
   "repository": "https://github.com/EliteMay/osu-hub",
   "pagesUrl": "https://elitemay.github.io/osu-hub/",
@@ -7,7 +7,8 @@
     "provider": "Cloudflare Workers",
     "workerUrl": "",
     "syncLimit": 100,
-    "includeFails": true
+    "includeFails": true,
+    "requestTimeoutMs": 15000
   },
   "launcher": {
     "name": "osu Setup Launcher",

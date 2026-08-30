@@ -1,8 +1,48 @@
 <!doctype html>
-<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Settings | osu! Hub</title><link rel="stylesheet" href="../css/styles.css"></head>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="osu!のDPI、感度、タブレット設定とosu! Hubのバックアップを管理するSettings画面。">
+  <title>Settings | osu! Hub</title>
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
 <body data-page="settings">
-<header class="topbar"><a class="brand" href="../index.html"><span class="brand-mark">osu!</span><span>Hub</span></a><nav class="nav"><a href="./account.html">Account Sync</a><a href="./coaching.html">AI Coach</a><a href="./results.html">Results</a><a href="./practice.html">Practice</a><a href="./stats.html">Stats</a><a href="./settings.html">Settings</a><a href="./tools.html">Desktop Tools</a></nav></header>
-<main class="container"><section class="page-head"><div><p class="eyebrow">player profile</p><h1>Settings</h1><p class="lead">感度やタブレット設定を保存し、変更前後を追いやすくする。データのバックアップもここから。</p></div><a class="button ghost" href="./account.html">Account Sync設定</a></section>
-<div class="split"><section class="panel flat"><p class="eyebrow">player</p><h2>プレイヤー設定</h2><form id="settingsForm" class="form-grid"><div class="field"><label>プレイヤー名</label><input name="playerName" placeholder="osu! name"></div><div class="field"><label>メインモード</label><select name="mode"><option>osu!</option><option>osu!taiko</option><option>osu!catch</option><option>osu!mania</option></select></div><div class="field"><label>DPI</label><input name="dpi" type="number" min="0" step="1" placeholder="1600"></div><div class="field"><label>osu!感度</label><input name="sensitivity" type="number" min="0" step="0.001" placeholder="1.0"></div><div class="field"><label>Tablet Area Width</label><input name="tabletWidth" type="number" min="0" step="0.01" placeholder="mm"></div><div class="field"><label>Tablet Area Height</label><input name="tabletHeight" type="number" min="0" step="0.01" placeholder="mm"></div><div class="field"><label>Offset X</label><input name="tabletX" type="number" step="0.01"></div><div class="field"><label>Offset Y</label><input name="tabletY" type="number" step="0.01"></div><div class="field full"><label>メモ</label><textarea name="notes" placeholder="キーボード、ペン、姿勢、変更理由など"></textarea></div><div class="field full"><div class="actions"><button class="button primary" type="submit">設定を保存</button></div></div></form></section>
-<aside class="stack"><section class="panel flat"><p class="eyebrow">backup</p><h2>データ保存</h2><p class="muted">Results / Coaching / Practice / SettingsをまとめてJSONへ書き出す。Account Sync設定もSettingsに含まれる。</p><div class="actions"><button id="exportBackup" class="button primary">バックアップを書き出す</button></div><div class="field" style="margin-top:16px"><label>バックアップJSON</label><input id="backupFile" type="file" accept="application/json,.json"></div><div class="actions"><button id="importBackup" class="button ghost">バックアップを読み込む</button></div></section><section class="panel flat"><div class="notice"><strong>保存場所</strong><br>通常データはブラウザのIndexedDBに保存されます。ブラウザデータ削除に備えて定期的にJSONバックアップを推奨。</div></section></aside></div>
-</main><footer class="footer"><span>osu! Hub v0.2.0</span><span>公開GitHubには個人設定を書き込みません。</span></footer><script src="../js/storage.js"></script><script src="../js/app.js"></script></body></html>
+<header class="topbar">
+  <a class="brand" href="../index.html"><span class="brand-mark">osu!</span><span>Hub</span></a>
+  <nav class="nav" aria-label="メインナビゲーション"><a href="./account.html">Account Sync</a><a href="./coaching.html">AI Coach</a><a href="./results.html">Results</a><a href="./practice.html">Practice</a><a href="./stats.html">Stats</a><a href="./settings.html">Settings</a><a href="./tools.html">Desktop Tools</a></nav>
+</header>
+<main class="container">
+<section class="page-head"><div><p class="eyebrow">player profile</p><h1>Settings</h1><p class="lead">感度やタブレット設定を保存し、変更前後を追いやすくする。データのバックアップもここから。</p></div><a class="button ghost" href="./account.html">Account Sync設定</a></section>
+<div class="split">
+  <section class="panel flat">
+    <p class="eyebrow">player</p><h2>プレイヤー設定</h2>
+    <form id="settingsForm" class="form-grid">
+      <div class="field"><label for="playerName">プレイヤー名</label><input id="playerName" name="playerName" placeholder="osu! name"></div>
+      <div class="field"><label for="playerMode">メインモード</label><select id="playerMode" name="mode"><option>osu!</option><option>osu!taiko</option><option>osu!catch</option><option>osu!mania</option></select></div>
+      <div class="field"><label for="playerDpi">DPI</label><input id="playerDpi" name="dpi" type="number" min="0" step="1" placeholder="1600"></div>
+      <div class="field"><label for="playerSensitivity">osu!感度</label><input id="playerSensitivity" name="sensitivity" type="number" min="0" step="0.001" placeholder="1.0"></div>
+      <div class="field"><label for="tabletWidth">Tablet Area Width</label><input id="tabletWidth" name="tabletWidth" type="number" min="0" step="0.01" placeholder="mm"></div>
+      <div class="field"><label for="tabletHeight">Tablet Area Height</label><input id="tabletHeight" name="tabletHeight" type="number" min="0" step="0.01" placeholder="mm"></div>
+      <div class="field"><label for="tabletX">Offset X</label><input id="tabletX" name="tabletX" type="number" step="0.01"></div>
+      <div class="field"><label for="tabletY">Offset Y</label><input id="tabletY" name="tabletY" type="number" step="0.01"></div>
+      <div class="field full"><label for="playerNotes">メモ</label><textarea id="playerNotes" name="notes" placeholder="キーボード、ペン、姿勢、変更理由など"></textarea></div>
+      <div class="field full"><div class="actions"><button class="button primary" type="submit">設定を保存</button></div></div>
+    </form>
+  </section>
+  <aside class="stack">
+    <section class="panel flat">
+      <p class="eyebrow">backup</p><h2>データ保存</h2>
+      <p class="muted">Results / Coaching / Practice / SettingsをまとめてJSONへ書き出す。Importは全体を検証してRecovery Snapshotを作成し、読み戻し確認に失敗した場合はRollbackを試みます。</p>
+      <div class="actions"><button id="exportBackup" class="button primary" type="button">バックアップを書き出す</button></div>
+      <div class="field" style="margin-top:16px"><label for="backupFile">バックアップJSON</label><input id="backupFile" type="file" accept="application/json,.json"></div>
+      <div class="actions"><button id="importBackup" class="button ghost" type="button">バックアップを検証して読み込む</button></div>
+    </section>
+    <section class="panel flat"><div class="notice"><strong>保存場所</strong><br>通常データはブラウザのIndexedDBに保存されます。ブラウザデータ削除に備えて定期的にJSONバックアップを推奨。</div></section>
+  </aside>
+</div>
+</main>
+<footer class="footer"><span>osu! Hub <strong data-site-version></strong></span><span>公開GitHubには個人設定を書き込みません。</span></footer>
+<script src="../js/storage.js"></script><script src="../js/app.js"></script><script src="../js/site-meta.js"></script>
+</body>
+</html>
