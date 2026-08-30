@@ -131,13 +131,23 @@ data/site.json
 
 Electronソースやbat類はPages配信物へ含めません。
 
-想定URL:
+公開URL:
 
 ```text
 https://elitemay.github.io/osu-hub/
 ```
 
-GitHub側でPagesのSourceを `GitHub Actions` に設定する必要があります。未設定の場合、ワークフローを追加しただけでは公開URLが有効にならない場合があります。
+`Deploy osu Hub Pages` ワークフローの成功を確認済みです。実ブラウザ上での全操作・見た目の最終確認は別途行います。
+
+## 自動チェック
+
+`.github/workflows/check-web.yml` で以下を確認します。
+
+- `js/storage.js` / `js/app.js` のJavaScript構文
+- `data/site.json` / `data/config.json` / `version.json` のJSON形式
+- `index.html` と `pages/*.html` のローカルリンク切れ
+
+初回チェックは成功済みです。
 
 ## ファイル構成
 
@@ -166,6 +176,7 @@ src/                            # 現行Electron Launcher本体
 tools/                          # Desktop Launcher補助スクリプト
 .github/workflows/
   pages.yml
+  check-web.yml
   build-windows.yml
 package.json
 version.json                    # Desktop Launcher更新情報
@@ -211,11 +222,13 @@ https://github.com/EliteMay/osu-hub/releases
 
 ## 既知の問題 / 未確認
 
-- GitHub PagesのRepository Settings側で公開設定が必要
+- GitHub Pagesの実ブラウザで全ページ・主要操作を通した最終確認は未実施
 - Windows実機でのSetup Launcher動作は今回未確認
 - GitHub ReleasesのSetup.exe初回配布はまだ未実施
 - AI Coachingの画像内容自体はWeb側で解析せず、ChatGPTへ渡して解析する方式
+- AI Coachingで選択中の画像はページ再読み込み後には保持しない
 - ResultsのスクリーンショットOCR自動入力は未実装
+- Setup Launcherの音声切替はWindows環境依存の問題が残っている
 
 ## 今後の候補
 
