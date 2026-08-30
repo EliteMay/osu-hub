@@ -1,0 +1,81 @@
+{
+  "configVersion": 17,
+  "appName": "osu Setup Launcher",
+  "profileName": "osu用セットアップ",
+  "launchDelayMs": 900,
+  "audioSwitch": {
+    "enabled": true,
+    "label": "イヤホン切替",
+    "mode": "svcl",
+    "deviceName": "スピーカー",
+    "scriptPath": "tools\\switch_audio_device.ps1",
+    "customCommand": "",
+    "command": "",
+    "memo": "v17ではSVCLの一覧から実在する項目を照合してから切り替える。見つからない場合は実行せず、音声デバイス一覧を表示する。",
+    "helperPath": "tools\\AudioSwitcher.cs",
+    "soundVolumeViewPath": "",
+    "nircmdPath": "tools\\nircmdc.exe",
+    "tryCandidates": false,
+    "svclPath": "tools\\svcl.exe"
+  },
+  "apps": [
+    {
+      "id": "tablet",
+      "name": "OpenTabletDriver.UX",
+      "targetPath": "",
+      "candidates": [
+        "OpenTabletDriver.UX.Wpf.exe",
+        "OpenTabletDriver.UX.exe",
+        "OpenTabletDriver.Daemon.exe"
+      ],
+      "args": [],
+      "enabled": true,
+      "waitAfterMs": 900,
+      "memo": "初回にOpenTabletDriver.UX.exeまたはそのフォルダを設定してください。設定はElectron userData側へ保存されます。"
+    },
+    {
+      "id": "real",
+      "name": "REAL 遅延対策",
+      "targetPath": "",
+      "candidates": [],
+      "args": [],
+      "enabled": true,
+      "waitAfterMs": 700,
+      "memo": "初回に遅延対策アプリ（REAL.exe等）のパスを設定してください。"
+    },
+    {
+      "id": "osu",
+      "name": "osu!lazer",
+      "targetPath": "",
+      "candidates": [
+        "osu!.exe",
+        "osu.exe",
+        "osu-lazer.exe",
+        "osu.Game.exe",
+        "osu.Desktop.exe",
+        "osu-lazer.Desktop.exe",
+        "osu!.lnk",
+        "osu lazer.lnk",
+        "osu!lazer.lnk"
+      ],
+      "args": [],
+      "enabled": true,
+      "waitAfterMs": 0,
+      "memo": "未設定でも共通保存先からosu!lazerを自動検出します。見つからない場合は「exe候補を自動検索」または「exeを選ぶ」を使ってください。"
+    }
+  ],
+  "checks": [
+    "初回はOpenTabletDriverと遅延対策アプリのパスを設定する",
+    "osu!lazerは未設定でも一般的な保存先から自動検出する",
+    "音声切替はSVCLモード推奨。まず「SVCLを自動取得」を押す",
+    "音声デバイス一覧のNameまたはIDを切り替えたい音声名へ入れる",
+    "入力名が一覧に存在しない場合は音声切替を実行しない"
+  ],
+  "updateCheck": {
+    "enabled": true,
+    "versionUrl": "https://raw.githubusercontent.com/EliteMay/osu-setup-launcher/main/version.json",
+    "memo": "更新確認はversion.jsonのURLを見に行く軽量方式です。URL未設定ならスキップします。自動上書き更新は行いません。",
+    "lastDownloadUrl": ""
+  },
+  "appVersion": "0.17.0"
+}
