@@ -18,8 +18,8 @@ const desktopUpdate = json('version.json');
 if (!/^\d+\.\d+\.\d+$/.test(String(site.siteVersion || ''))) {
   fail('data/site.json siteVersion must use x.y.z format.');
 }
-if (projectMeta.guideVersion !== '1.1.1') {
-  fail(`project-meta.json guideVersion must be 1.1.1 (actual: ${projectMeta.guideVersion}).`);
+if (projectMeta.guideVersion !== '1.2.0') {
+  fail(`project-meta.json guideVersion must be 1.2.0 (actual: ${projectMeta.guideVersion}).`);
 }
 const requiredProfiles = ['STATIC', 'DATA', 'AI-HANDOFF', 'CLOUD', 'ELECTRON', 'TOOL'];
 for (const profile of requiredProfiles) {
@@ -27,6 +27,12 @@ for (const profile of requiredProfiles) {
 }
 if (projectMeta.sourcesOfTruth?.webVersion !== 'data/site.json#siteVersion') {
   fail('Web version Source of Truth must be data/site.json#siteVersion.');
+}
+if (projectMeta.runtimePolicy?.stablePaths !== true || projectMeta.runtimePolicy?.versionedRuntimeFolders !== false) {
+  fail('project-meta.json must declare stable runtime paths and no versioned runtime folders.');
+}
+if (projectMeta.runtimePolicy?.rendererOwnsDom !== true) {
+  fail('project-meta.json must record Renderer owns its DOM policy.');
 }
 if (desktopPackage.version !== desktopUpdate.latestVersion || desktopPackage.version !== site.launcher?.version) {
   fail(`Desktop version mismatch: package=${desktopPackage.version}, version.json=${desktopUpdate.latestVersion}, site.json=${site.launcher?.version}`);
@@ -84,10 +90,32 @@ if (/\.nav\s*\{[^}]*display\s*:\s*none/is.test(css)) fail('Navigation must not d
 if (!/:focus-visible/.test(css)) fail('styles.css must provide focus-visible styling.');
 if (!/@media\s*\(prefers-reduced-motion\s*:\s*reduce\)/.test(css)) fail('styles.css must respect prefers-reduced-motion.');
 
+const webJsFiles = fs.readdirSync(path.join(root, 'js')).filter((name) => name.endsWith('.js')).map((name) => `js/${name}`);
+for (const file of webJsFiles) {
+  const source = read(file);
+  if (/\bMutationObserver\b/.test(source)) fail(`${file}: MutationObserver DOM patching is not allowed in the stable runtime.`);
+  if (/\bv\d{2,}[\\/]/i.test(file) || /(?:^|[-_.])v\d{2,}(?:[-_.]|$)/i.test(path.basename(file))) {
+    fail(`${file}: versioned runtime path detected.`);
+  }
+}
+for (const dir of ['js', 'css']) {
+  for (const name of fs.readdirSync(path.join(root, dir))) {
+    if (/^v\d+/i.test(name) || /(?:^|[-_.])v\d{2,}(?:[-_.]|$)/i.test(name)) {
+      fail(`${dir}/${name}: versioned runtime path detected.`);
+    }
+  }
+}
+
+const storageSource = read('js/storage.js');
+for (const marker of ['recoverySnapshot', 'verifyImported', 'replaceAllStores', 'Rollback']) {
+  if (!storageSource.includes(marker)) fail(`js/storage.js: missing import recovery marker ${marker}.`);
+}
+if (!/const\s+SCHEMA_VERSION\s*=\s*1\b/.test(storageSource)) fail('js/storage.js: SCHEMA_VERSION must be explicit.');
+
 const publicFiles = [
   'index.html',
   ...htmlFiles.filter((file) => file !== 'index.html'),
-  ...fs.readdirSync(path.join(root, 'js')).filter((name) => name.endsWith('.js')).map((name) => `js/${name}`),
+  ...webJsFiles,
   'data/site.json',
 ];
 const assignedSecret = /(?:OSU_CLIENT_SECRET|clientSecret|apiSecret)\s*[:=]\s*["'][^"']{4,}["']/i;
@@ -113,4 +141,4 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log(`Validated ${htmlFiles.length} HTML files, project metadata, versions, storage-facing public files, and responsive/accessibility guards: OK`);
+console.log(`Validated ${htmlFiles.length} HTML files, project metadata, versions, stable runtime paths, import recovery guards, and responsive/accessibility/security rules: OK`);
