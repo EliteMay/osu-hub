@@ -1,0 +1,160 @@
+name: Refresh osu API Token
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */12 * * *"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/refresh-osu-token.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: osu-hub-api-production
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: Refresh pre-issued token
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate required secrets
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          OSU_CLIENT_ID: ${{ secrets.OSU_CLIENT_ID }}
+          OSU_CLIENT_SECRET: ${{ secrets.OSU_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID OSU_CLIENT_ID OSU_CLIENT_SECRET; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing repository secret: ${name}"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Request osu client-credentials token outside Cloudflare
+        shell: bash
+        env:
+          OSU_CLIENT_ID: ${{ secrets.OSU_CLIENT_ID }}
+          OSU_CLIENT_SECRET: ${{ secrets.OSU_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          body_file="$(mktemp)"
+          header_file="$(mktemp)"
+          trap 'rm -f "$body_file" "$header_file"' EXIT
+
+          status="$(curl --silent --show-error \
+            --output "$body_file" \
+            --dump-header "$header_file" \
+            --write-out '%{http_code}' \
+            --request POST 'https://osu.ppy.sh/oauth/token' \
+            --header 'Accept: application/json' \
+            --header 'Content-Type: application/x-www-form-urlencoded' \
+            --data-urlencode "client_id=${OSU_CLIENT_ID}" \
+            --data-urlencode "client_secret=${OSU_CLIENT_SECRET}" \
+            --data-urlencode 'grant_type=client_credentials' \
+            --data-urlencode 'scope=public')"
+
+          if [ "$status" != "200" ]; then
+            retry_after="$(awk 'BEGIN{IGNORECASE=1} /^retry-after:/ {gsub("\r", "", $2); print $2; exit}' "$header_file")"
+            if [ -n "$retry_after" ]; then
+              echo "::error::osu! token request failed (HTTP ${status}, Retry-After: ${retry_after}s)."
+            else
+              echo "::error::osu! token request failed (HTTP ${status})."
+            fi
+            exit 1
+          fi
+
+          token="$(node -e '
+            const fs = require("fs");
+            const value = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            if (value?.token_type !== "Bearer" || typeof value?.access_token !== "string" || value.access_token.length < 20) process.exit(2);
+            process.stdout.write(value.access_token);
+          ' "$body_file")"
+          expires_in="$(node -e '
+            const fs = require("fs");
+            const value = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            const seconds = Number(value?.expires_in);
+            if (!Number.isFinite(seconds) || seconds < 3600) process.exit(2);
+            process.stdout.write(String(Math.trunc(seconds)));
+          ' "$body_file")"
+
+          echo "::add-mask::${token}"
+          printf 'OSU_ACCESS_TOKEN=%s\n' "$token" >> "$GITHUB_ENV"
+          printf 'OSU_TOKEN_EXPIRES_IN=%s\n' "$expires_in" >> "$GITHUB_ENV"
+          echo "osu! client-credentials token issued successfully (${expires_in}s lifetime)."
+
+      - name: Verify token against osu API v2
+        shell: bash
+        run: |
+          set -euo pipefail
+          body_file="$(mktemp)"
+          trap 'rm -f "$body_file"' EXIT
+
+          status="$(curl --silent --show-error \
+            --output "$body_file" \
+            --write-out '%{http_code}' \
+            --connect-timeout 10 --max-time 30 \
+            'https://osu.ppy.sh/api/v2/users/2/osu' \
+            --header 'Accept: application/json' \
+            --header "Authorization: Bearer ${OSU_ACCESS_TOKEN}")"
+
+          if [ "$status" != "200" ]; then
+            echo "::error::Pre-issued token API verification failed (HTTP ${status})."
+            exit 1
+          fi
+
+          node -e '
+            const fs = require("fs");
+            const value = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            if (Number(value?.id) !== 2 || !String(value?.username || "").trim()) throw new Error("Unexpected Get User response");
+            console.log("osu! API v2 token verification: OK");
+          ' "$body_file"
+
+      - name: Store token as Cloudflare Worker secret
+        id: deploy
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: cloudflare/worker
+          wranglerVersion: "4.127.1"
+          secrets: |
+            OSU_ACCESS_TOKEN
+          command: deploy
+
+      - name: Record refresh result
+        shell: bash
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DEPLOYMENT_URL:-}" ]; then
+            echo "::error::Wrangler did not return a deployment URL."
+            exit 1
+          fi
+          {
+            echo "## osu! API token refresh"
+            echo
+            echo "- Token source: GitHub Actions runner"
+            echo "- Lifetime reported by osu!: ${OSU_TOKEN_EXPIRES_IN}s"
+            echo "- Stored in Worker secret: OSU_ACCESS_TOKEN"
+            echo "- Client Secret stored in Worker: no"
+            echo "- Worker redeployed: ${DEPLOYMENT_URL}"
+            echo "- Trigger: ${GITHUB_EVENT_NAME}"
+          } >> "$GITHUB_STEP_SUMMARY"
