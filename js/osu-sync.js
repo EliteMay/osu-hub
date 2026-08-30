@@ -140,8 +140,11 @@
     if (!payload || payload.ok !== true || payload.service !== 'osu-hub-api' || typeof payload.configured !== 'boolean') {
       throw new Error('Workerのhealth応答形式が正しくありません。');
     }
-    if (payload.upstreamMode !== 'public-web' || payload.oauthRequired !== false) {
-      throw new Error('Workerが旧OAuth同期方式です。デプロイ反映後に再試行してください。');
+    if (payload.configured !== true) {
+      throw new Error('Workerのosu!同期Tokenが設定されていません。自動更新Workflowの状態を確認してください。');
+    }
+    if (payload.upstreamMode !== 'api-v2-preissued-token' || payload.browserOAuthRequired !== false || payload.tokenManagedBy !== 'github-actions') {
+      throw new Error('Workerが現行のAPI v2同期方式ではありません。デプロイ反映後に再試行してください。');
     }
     return payload;
   }
@@ -286,7 +289,7 @@
       const settings = await saveSettings();
       setStatus('Cloudflare Workerへ接続しています…');
       validateHealth(await workerFetch(settings, '/health'));
-      setStatus('Worker接続OK。osu!公開プロフィール経路を利用できます。', 'success');
+      setStatus('Worker接続OK。osu! API v2の同期Tokenを利用できます。', 'success');
       toast('接続確認に成功しました。');
     } catch (error) {
       setStatus(error.message || '接続確認に失敗しました。', 'notice');
