@@ -140,6 +140,9 @@
     if (!payload || payload.ok !== true || payload.service !== 'osu-hub-api' || typeof payload.configured !== 'boolean') {
       throw new Error('Workerのhealth応答形式が正しくありません。');
     }
+    if (payload.upstreamMode !== 'public-web' || payload.oauthRequired !== false) {
+      throw new Error('Workerが旧OAuth同期方式です。デプロイ反映後に再試行してください。');
+    }
     return payload;
   }
 
@@ -282,9 +285,8 @@
     try {
       const settings = await saveSettings();
       setStatus('Cloudflare Workerへ接続しています…');
-      const health = validateHealth(await workerFetch(settings, '/health'));
-      if (!health.configured) throw new Error('Workerは動いていますが、osu! Client ID / Secretが未設定です。');
-      setStatus('Worker接続OK。osu! API用Secretも設定されています。', 'success');
+      validateHealth(await workerFetch(settings, '/health'));
+      setStatus('Worker接続OK。osu!公開プロフィール経路を利用できます。', 'success');
       toast('接続確認に成功しました。');
     } catch (error) {
       setStatus(error.message || '接続確認に失敗しました。', 'notice');
@@ -300,7 +302,7 @@
     try {
       const settings = await saveSettings();
       if (!settings.user) throw new Error('osu! User IDまたはユーザー名を入力してください。');
-      setStatus('osu! APIから最近のプレイを取得しています…');
+      setStatus('osu!から最近のプレイを取得しています…');
       const params = new URLSearchParams({
         user: settings.user,
         mode: settings.mode,
