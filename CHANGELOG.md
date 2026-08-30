@@ -2,6 +2,26 @@
 
 Web Versionの正本は `data/site.json` の `siteVersion` です。Desktop Launcher Versionの正本は `package.json` の `version` です。
 
+## Web 0.2.2 - 2026-08-30
+
+### Changed
+
+- Cloudflare Worker本番URLを `data/site.json` に設定
+- Home / Account Syncの既定接続先を本番Workerへ切替
+- README / 作業報告を本番deploy済み状態へ更新
+
+### Verified
+
+- `Deploy osu Hub API Worker` Workflow成功
+- Worker URL発行
+- `/health` 成功
+- osu! OAuth Secret設定済み状態をWorkflowで確認
+
+### Unverified
+
+- 実osu!アカウントのRecent Scores同期
+- Account Sync → Results → Statsの実ブラウザE2E
+
 ## Web 0.2.1 - 2026-08-30
 
 ### Changed
@@ -26,15 +46,6 @@ Web Versionの正本は `data/site.json` の `siteVersion` です。Desktop Laun
 - `js/site-meta.js`
 - `tests/validate-web.mjs`
 - `.github/workflows/deploy-worker.yml`
-
-### Unverified
-
-- Cloudflare Worker本番deploy
-- GitHub Repository Secretsの本番設定
-- 実osu!アカウント同期
-- Backup / Import / Rollbackの実ブラウザE2E
-- 今回変更後のFirefox / Chromium実ブラウザE2E
-- Windows固有Desktop Launcher動作
 
 ## Web 0.2.0 - 2026-08-30
 
