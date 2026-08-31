@@ -39,11 +39,10 @@ for (const marker of [
   'MATCH_TOKENS',
   'AVAILABLE_DEVICES',
   'AUDIO_MATCH_SELF_TEST_OK',
-  "Speakers (FxSound Audio Enhancer)",
-  "スピーカー (FxSound Audio Enhancer)",
-  "FxSound Speakers",
-  "'speaker', 'speakers'",
-  "'スピーカー'"
+  'Localized Output (FxSound Audio Enhancer)',
+  'Speakers (FxSound Audio Enhancer)',
+  'FxSound Speakers',
+  "'speaker', 'speakers'"
 ]) {
   if (!fallbackScript.includes(marker)) fail(`switch_audio_device.ps1 is missing marker: ${marker}`);
 }
