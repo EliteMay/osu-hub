@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#17131f">
+  <meta name="theme-color" content="#0b0b0f">
   <meta name="description" content="osu!のリザルト同期、AIコーチング、練習管理、統計、設定、Desktop Toolsをまとめた個人向けHub。">
   <title>osu! Hub</title>
   <link rel="stylesheet" href="./css/styles.css">
@@ -25,18 +25,21 @@
   <main class="container">
     <section class="hero">
       <div>
-        <p class="eyebrow">osu! personal performance hub</p>
-        <h1>プレイ・分析・練習・環境構築を、ここにまとめる。</h1>
-        <p class="lead">osu!アカウントからのリザルト同期、大量データをChatGPTへ渡すAIコーチング、成長記録、練習管理、設定保存、Setup Launcher配布までを1つにまとめたosu!用ハブ。</p>
+        <p class="eyebrow">performance workspace</p>
+        <h1>osu!の記録と改善を、1つのワークスペースに。</h1>
+        <p class="lead">Recent / Bestの同期、リザルト比較、AIコーチング、練習管理、プレイヤー設定、Windows環境の準備まで。プレイ前後の作業をページ移動で迷わない形にまとめます。</p>
         <div class="hero-actions">
-          <a class="button primary" href="./pages/account.html">Account Syncを設定</a>
-          <a class="button ghost" href="./pages/coaching.html">AIコーチング</a>
+          <a class="button primary" href="./pages/account.html">プレイ結果を同期</a>
+          <a class="button ghost" href="./pages/coaching.html">AIコーチを開く</a>
         </div>
       </div>
       <div class="hero-panel">
         <div class="status-dot" aria-hidden="true"></div>
-        <strong>Local-first + safe API relay</strong>
-        <p>プレイデータはブラウザのIndexedDBへ保存。osu! Client SecretはCloudflare Worker側だけで管理。</p>
+        <strong>Local-first / Supabase relay</strong>
+        <p>Results・Coaching・PracticeはブラウザのIndexedDBへ保存。osu! APIへの接続はSupabase Edge Functionを経由し、Client Secretをブラウザへ置きません。</p>
+        <div class="hero-meta" aria-label="構成">
+          <span>IndexedDB</span><span>osu! API v2</span><span>Desktop Launcher</span>
+        </div>
       </div>
     </section>
 
@@ -48,32 +51,32 @@
     </section>
 
     <section class="section-head">
-      <div><p class="eyebrow">features</p><h2>主要機能</h2></div>
-      <p>手入力だけに依存せず、osu! APIから取得したプレイも同じResults・Statsへまとめて扱う。</p>
+      <div><p class="eyebrow">workspace</p><h2>次にやることから開く</h2></div>
+      <p>同期・分析・練習・環境設定を役割ごとに分け、必要な画面へ最短で移動できます。</p>
     </section>
 
     <section class="feature-grid">
       <a class="feature-card featured" href="./pages/account.html">
         <span class="badge" data-account-sync-badge>SETUP REQUIRED</span>
         <h3>Account Sync</h3>
-        <p>Cloudflare Worker経由でRecent Scoresを最大100件取得。Worker設定前はセットアップ画面として表示。</p>
+        <p>Supabase Edge Function経由でRecent PlaysとBest Scoresを取得し、同じScore IDを重複させずResultsへ蓄積します。</p>
         <span class="card-link" data-account-sync-cta>設定する →</span>
       </a>
-      <a class="feature-card featured" href="./pages/coaching.html"><span class="badge">CORE</span><h3>AI Coaching</h3><p>複数のリザルト画像とメモをまとめてChatGPT提出用ZIPにする。返却JSONもSchema検証して保存。</p><span class="card-link">開く →</span></a>
-      <a class="feature-card" href="./pages/results.html"><h3>Results</h3><p>API同期または手入力でACC・Miss・Combo・PP・★・BPM・MODを保存し、後から比較できる。</p><span class="card-link">開く →</span></a>
-      <a class="feature-card" href="./pages/stats.html"><h3>Stats</h3><p>保存したリザルトから平均ACC、PP、Miss傾向などを軽量なグラフで確認。</p><span class="card-link">開く →</span></a>
-      <a class="feature-card" href="./pages/practice.html"><h3>Practice</h3><p>今日の練習内容、目標、完了状況を管理する。</p><span class="card-link">開く →</span></a>
-      <a class="feature-card" href="./pages/settings.html"><h3>Player Settings</h3><p>DPI、感度、タブレットArea、メモを保存。検証付きJSONバックアップもここから行う。</p><span class="card-link">開く →</span></a>
-      <a class="feature-card" href="./pages/tools.html"><h3>Desktop Tools</h3><p>音声切替、OpenTabletDriver、遅延対策、osu!lazerをまとめて起動するSetup Launcher。</p><span class="card-link">開く →</span></a>
+      <a class="feature-card featured" href="./pages/coaching.html"><span class="badge">CORE</span><h3>AI Coaching</h3><p>複数のリザルト画像とメモをまとめてChatGPTへ渡し、分析結果をSchema検証して履歴へ残します。</p><span class="card-link">分析を準備 →</span></a>
+      <a class="feature-card" href="./pages/results.html"><h3>Results</h3><p>API同期・手入力の両方を1つの履歴へまとめ、ACC・Miss・PP・★・BPM・MODを比較します。</p><span class="card-link">リザルトを見る →</span></a>
+      <a class="feature-card" href="./pages/stats.html"><h3>Stats</h3><p>保存済みリザルトから平均ACC、PP、Miss傾向などを軽量なグラフで確認します。</p><span class="card-link">傾向を見る →</span></a>
+      <a class="feature-card" href="./pages/practice.html"><h3>Practice</h3><p>今日の練習内容、目標、完了状況を管理して次のプレイへつなげます。</p><span class="card-link">練習を開く →</span></a>
+      <a class="feature-card" href="./pages/settings.html"><h3>Player Settings</h3><p>DPI、感度、タブレットArea、メモ、検証付きJSONバックアップをまとめて管理します。</p><span class="card-link">設定を見る →</span></a>
+      <a class="feature-card" href="./pages/tools.html"><h3>Desktop Tools</h3><p>音声出力、OpenTabletDriver、遅延対策、osu!lazerの起動準備をSetup Launcherでまとめます。</p><span class="card-link">Windowsツール →</span></a>
     </section>
 
     <section class="panel recent-panel">
-      <div class="panel-title"><div><p class="eyebrow">recent</p><h2>最近のリザルト</h2></div><a href="./pages/results.html">すべて見る</a></div>
+      <div class="panel-title"><div><p class="eyebrow">recent</p><h2>最近のリザルト</h2></div><a href="./pages/results.html">すべて見る →</a></div>
       <div id="homeRecentResults" class="list-empty">まだリザルトがありません。Account SyncまたはResultsから追加できます。</div>
     </section>
   </main>
 
-  <footer class="footer"><span>osu! Hub <strong data-site-version></strong></span><span>Secrets stay out of GitHub Pages.</span></footer>
+  <footer class="footer"><span>osu! Hub <strong data-site-version></strong></span><span>Local-first data / secrets stay out of GitHub Pages.</span></footer>
   <script src="./js/storage.js"></script>
   <script src="./js/app.js"></script>
   <script src="./js/site-meta.js"></script>
