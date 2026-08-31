@@ -17,7 +17,7 @@ const desktopPackage = json('package.json');
 const desktopUpdate = json('version.json');
 
 if (!/^\d+\.\d+\.\d+$/.test(String(site.siteVersion || ''))) fail('data/site.json siteVersion must use x.y.z format.');
-if (projectMeta.guideVersion !== '1.3.0') fail(`project-meta.json guideVersion must be 1.3.0 (actual: ${projectMeta.guideVersion}).`);
+if (projectMeta.guideVersion !== '1.6.0') fail(`project-meta.json guideVersion must be 1.6.0 (actual: ${projectMeta.guideVersion}).`);
 for (const profile of ['STATIC', 'DATA', 'AI-HANDOFF', 'CLOUD', 'ELECTRON', 'TOOL']) {
   if (!projectMeta.profiles?.includes(profile)) fail(`project-meta.json is missing profile: ${profile}`);
 }
@@ -119,6 +119,7 @@ if (!/href=["']https:\/\/github\.com\/EliteMay\/osu-hub\/releases\/latest["']/.t
 const launcherVersionPattern = new RegExp(`(?:配布中|配布版):\\s*v${escapeRegex(site.launcher?.version)}`);
 if (!launcherVersionPattern.test(toolsHtml)) fail('Desktop Tools must show the current published launcher version from site metadata.');
 if (/Setup\.exeの初回配布は未確認/.test(toolsHtml)) fail('Desktop Tools must not show the old unreleased notice after publication.');
+if (!/One-click Update/.test(toolsHtml) || !/v0\.18\.2だけはSetup\.exeを一度手動/.test(toolsHtml)) fail('Desktop Tools must explain the v0.18.2 one-time manual install and future one-click updates.');
 
 const refreshWorkflow = read('.github/workflows/refresh-osu-token.yml');
 for (const marker of ['OSU_CLIENT_ID', 'OSU_CLIENT_SECRET', 'data/site.json', 'action: "refresh"', 'action":"health', 'supabase-edge-function', 'scoreType":"recent', 'scoreType":"best', 'Recent Plays smoke', 'Best Scores smoke']) {
@@ -133,7 +134,7 @@ if (!/supabase\/functions\/\*\*/.test(checkWorkflow)) fail('Check web path filte
 
 if (!fs.existsSync(path.join(root, '.github/workflows/build-windows.yml'))) fail('Windows build/release workflow must exist.');
 const windowsWorkflow = fs.existsSync(path.join(root, '.github/workflows/build-windows.yml')) ? read('.github/workflows/build-windows.yml') : '';
-for (const marker of ['pull_request:', 'contents: write', 'Check Electron JavaScript syntax', 'node --check src/main.js', 'Verify installer', "github.event_name != 'pull_request'", 'gh release create', 'gh release upload', 'osu_setup_${version}_setup.exe']) {
+for (const marker of ['pull_request:', 'contents: write', 'Check Electron JavaScript syntax', 'node --check src/main.js', 'node --check src/updater.js', 'Check auto-update regression guards', 'dist/latest.yml', '.blockmap', 'Verify installer', "github.event_name != 'pull_request'", 'gh release create', 'gh release upload', 'osu_setup_${version}_setup.exe']) {
   if (windowsWorkflow && !windowsWorkflow.includes(marker)) fail(`build-windows.yml: missing release/build guard ${marker}.`);
 }
 
@@ -144,6 +145,13 @@ for (const marker of ['verifySvclDefaultAliases', 'DefaultRenderDevice', 'Defaul
 const audioFallback = read('tools/switch_audio_device.ps1');
 for (const marker of ['SetDefaultRenderDevice', 'GetRenderDevices', 'VERIFIED_DEFAULT', 'Default verification failed']) {
   if (!audioFallback.includes(marker)) fail(`switch_audio_device.ps1: missing fallback verification guard ${marker}.`);
+}
+
+if (desktopPackage.main !== 'src/bootstrap.js') fail('Desktop package main must use the updater bootstrap.');
+if (!desktopPackage.dependencies?.['electron-updater']) fail('electron-updater must be a production dependency.');
+const updaterSource = read('src/updater.js');
+for (const marker of ['autoUpdater.checkForUpdates()', 'autoUpdater.downloadUpdate()', 'autoUpdater.quitAndInstall(false, true)', '今すぐ更新', 'Releaseページを開く']) {
+  if (!updaterSource.includes(marker)) fail(`src/updater.js: missing one-click update guard ${marker}.`);
 }
 
 const publicFiles = ['index.html', ...htmlFiles.filter((file) => file !== 'index.html'), ...webJsFiles, 'data/site.json'];
@@ -162,7 +170,7 @@ for (const marker of ['osu_api_tokens', 'SUPABASE_SERVICE_ROLE_KEY', 'action ===
 }
 if (functionSource && /console\.log\([^\n]*(clientSecret|accessToken)/.test(functionSource)) fail('Supabase function must not log OAuth secrets or access tokens.');
 
-if (!fs.existsSync(path.join(root, 'package-lock.json'))) warn('package-lock.json is not tracked; create it during the next Electron dependency install/update.');
+if (!fs.existsSync(path.join(root, 'package-lock.json'))) warn('package-lock.json is not tracked; dependency changes should generate and track it.');
 
 if (warnings.length) {
   console.log('Warnings:');
@@ -174,4 +182,4 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log(`Validated ${htmlFiles.length} HTML files, project metadata, versions, launcher release/audio verification guards, Recent/Best Supabase Account Sync guards, auto accumulation, token refresh policy, stable runtime paths, import recovery guards, and responsive/accessibility/security rules: OK`);
+console.log(`Validated ${htmlFiles.length} HTML files, project metadata, versions, launcher release/audio/auto-update guards, Recent/Best Supabase Account Sync guards, auto accumulation, token refresh policy, stable runtime paths, import recovery guards, and responsive/accessibility/security rules: OK`);
