@@ -1,12 +1,15 @@
 {
   "name": "osu-setup-launcher",
-  "version": "0.18.1",
+  "version": "0.18.2",
   "description": "osu!lazer 用の一括セットアップ起動Electronアプリ",
-  "main": "src/main.js",
+  "main": "src/bootstrap.js",
   "scripts": {
     "start": "electron .",
     "start:safe": "electron .",
     "build:win": "electron-builder --win nsis --x64 --publish never"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.9"
   },
   "devDependencies": {
     "electron": "^31.0.0",
@@ -19,6 +22,13 @@
     "directories": {
       "output": "dist"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "EliteMay",
+        "repo": "osu-hub"
+      }
+    ],
     "files": [
       "src/**/*",
       "data/**/*",
