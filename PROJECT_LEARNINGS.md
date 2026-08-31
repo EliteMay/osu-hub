@@ -100,6 +100,26 @@
 - Guide candidate: yes
 - Guide note: OS統合では「Provider Aで存在する」ことを「Provider BでもActive」と同一視しない、というReliability一般化候補。
 
+### PL-F-006 デバイス一覧にApplication音声セッションが混在すると部分一致で別Entityを選ぶ
+
+- Date: 2026-08-31
+- Status: monitoring
+- Severity: high
+- Cost: high
+- Symptom: v0.18.5で `High Definition Audio Device` を切替先にしたところ、Launcherが実デバイスではなく `Firefox | High Definition Audio Device\Application\Firefox` をmatchし、Windows Core Audio Fallbackでは `Device not found in Core Audio: Firefox` になった。
+- Expected: `High Definition Audio Device\Device\Speakers\Render` のような実際の再生Endpointだけを既定出力候補として扱う。
+- Actual: SVCL exportにはDevice EndpointとApplication Sessionが同じ一覧に含まれ、旧 `parseSvcl` はDirection/Render系文字列だけで抽出していた。さらにProvider名の部分一致Scoreが同点になり、一覧順でFirefoxを選択した。
+- Trigger / Reproduction: FirefoxがHigh Definition Audio Deviceを利用中の状態で、切替名を `High Definition Audio Device` にして音声テストを実行する。
+- Root Cause: 外部CLIの一覧を「全行が同じEntity Class」と仮定し、Type / ID path (`\Application\` vs `\Device\...\Render`) を選択条件に使っていなかった。また同点候補を安全停止せず先頭採用していた。
+- Final Fix: v0.18.6で純粋関数 `src/audio-matcher.js` を追加し、Application Sessionを除外、Device Render Endpointだけを候補化、完全IDを最優先、Generic Provider名ではActive Endpointを優先、同点は `ambiguous` として切替を中止する。
+- Affected files / systems: `src/audio-matcher.js`, `src/main.js`, `tests/validate-audio-interop.mjs`
+- Detection method: v0.18.5実Windowsログの `matched: Firefox | High Definition Audio Device\Application\Firefox`。
+- Regression Guard: Firefox Application fixture、High Definition Audio DeviceのActive Speakers / NotPresent Headphones fixture、FxSound fixture、同点Ambiguous fixtureをNode testへ追加。
+- Prevention: OS/CLIが複数Entity Classを同じ一覧で返す場合、表示名やDirectionだけでなくType / Stable ID namespaceでClassを確定してから照合する。同点・弱一致では破壊的/状態変更操作を実行しない。
+- Related Issue / PR / Commit: v0.18.6
+- Guide candidate: yes
+- Guide note: Windows固有Toolだけでなく、外部Providerの検索結果からState変更対象を選ぶ処理全般へ一般化できる。
+
 ---
 
 ## Success
@@ -138,4 +158,5 @@
 | PL-F-003 | failure | Provider間でDisplay Name完全一致を前提にしない | v0.18.2 Device not found | PL-F-004へ発展 |
 | PL-F-004 | failure | ローカライズ可能なデバイス種別語をEntity識別Tokenにしない | v0.18.3日本語Windows実機ログ | PL-F-005へ発展 |
 | PL-F-005 | failure | Provider間でState filter / lifecycle条件を揃える | v0.18.4でSVCLにはFxSound、Core Audio Active一覧には無し | 他Projectでも再発したらReliability / Integrationルールへ一般化 |
+| PL-F-006 | failure | 複数Entity Classが混在する外部一覧はType / Stable ID namespaceで先に絞る | v0.18.5でHigh Definition Audio Device指定がFirefox Application Sessionへ誤match | Electron / Reliabilityへ一般化候補 |
 | PL-S-002 | success | 継続配布ElectronはRelease Metadataを揃えOne-click Updateを優先 | Setup Launcher v0.18.2+ | Guideへ反映済み。実機Update Evidenceを継続追加 |

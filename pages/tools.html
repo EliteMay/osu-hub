@@ -17,7 +17,7 @@
 <div class="split">
   <section class="panel flat">
     <span class="badge">WINDOWS</span>
-    <h2>osu Setup Launcher <span class="muted" id="launcherVersion">0.18.5</span></h2>
+    <h2>osu Setup Launcher <span class="muted" id="launcherVersion">0.18.6</span></h2>
     <p class="lead">osu!を始める前の準備をまとめて実行。</p>
     <div class="data-list">
       <div class="practice-card"><span>1</span><div><strong>音声出力切替</strong><small>SoundVolumeCommandLine / SVCL + Windows Core Audio Fallback</small></div><span></span></div>
@@ -27,7 +27,7 @@
       <div class="practice-card"><span>5</span><div><strong>One-click Update</strong><small>起動時に新版を確認し、1回の操作でDownload / Restart / Update</small></div><span></span></div>
     </div>
     <div class="actions"><a class="button primary" data-launcher-release href="https://github.com/EliteMay/osu-hub/releases/latest">Windows版をダウンロード</a><a class="button ghost" href="https://github.com/EliteMay/osu-hub" target="_blank" rel="noopener noreferrer">GitHubを見る</a></div>
-    <div class="notice" style="margin-top:16px"><strong>配布版: v0.18.5</strong><br>v0.18.4の実機ログで、FxSound SpeakersはSVCLには存在する一方、Windows Core AudioのActive一覧には存在しない状態が確認されました。v0.18.5ではActiveだけでなくDisabled / Unplugged / NotPresentも診断し、FxSoundを対象にした場合はFxSound.exeの起動、Disabled EndpointのSVCL /Enable、Active化待機を行ってから既定出力を再設定します。失敗時は各Core Audio EndpointのStateもログへ表示します。v0.18.2からアプリ内One-click Updateに対応しています。v0.18.1以前にはUpdaterが入っていないため、<strong>v0.18.2だけはSetup.exeを一度手動でインストール</strong>してください。</div>
+    <div class="notice" style="margin-top:16px"><strong>配布版: v0.18.6</strong><br>v0.18.5の実機ログで、`High Definition Audio Device` を指定したときにSVCLのFirefox音声セッション（Application）を出力デバイスと誤認する問題が確認されました。v0.18.6ではApplication音声セッションを候補から除外し、`\Device\...\Render` の実デバイスEndpointだけを切替対象にします。同じProvider名の候補が複数ある場合はActive Endpointを優先し、同点なら勝手に切り替えず停止します。v0.18.2からアプリ内One-click Updateに対応しています。v0.18.1以前にはUpdaterが入っていないため、<strong>v0.18.2だけはSetup.exeを一度手動でインストール</strong>してください。</div>
   </section>
   <aside class="stack">
     <section class="panel flat"><p class="eyebrow">update flow</p><h2>v0.18.2以降</h2><p class="muted">起動時にGitHub Releasesを確認し、新版がある場合だけ通知します。「今すぐ更新」でDownload後にアプリを再起動して更新。失敗した場合は現在版をそのまま使い、Releaseページから手動更新できます。</p></section>
