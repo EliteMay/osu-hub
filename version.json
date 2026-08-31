@@ -1,5 +1,5 @@
 {
-  "latestVersion": "0.18.2",
+  "latestVersion": "0.18.3",
   "downloadUrl": "https://github.com/EliteMay/osu-hub/releases/latest",
-  "releaseNotes": "アプリ内One-click Updateを追加。v0.18.2以降は起動時にGitHub Releasesを確認し、新版があれば『今すぐ更新』1回でダウンロード・再起動・更新できます。ReleaseにはSetup.exeに加えてlatest.ymlとblockmapを配布します。"
+  "releaseNotes": "FxSoundのSVCL名『FxSound Speakers』とWindows Core AudioのFriendly Name『Speakers (FxSound Audio Enhancer)』のように語順・表記が異なる場合でも、Token照合で同じ再生Endpointを特定してWindows標準Fallbackを実行できるよう修正。Windows CIにFxSound語順差のSelf Testを追加。v0.18.2からはアプリ内One-click Updateで更新できます。"
 }
