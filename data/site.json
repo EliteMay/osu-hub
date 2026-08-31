@@ -1,11 +1,11 @@
 {
-  "siteVersion": "0.2.5",
+  "siteVersion": "0.2.6",
   "name": "osu! Hub",
   "repository": "https://github.com/EliteMay/osu-hub",
   "pagesUrl": "https://elitemay.github.io/osu-hub/",
   "osuApi": {
-    "provider": "Cloudflare Workers",
-    "workerUrl": "https://osu-hub-api.k12m45k.workers.dev",
+    "provider": "Supabase Edge Functions",
+    "endpointUrl": "https://vtnwbgejlaqpnwmlzbjy.supabase.co/functions/v1/osu-sync",
     "syncLimit": 100,
     "includeFails": true,
     "requestTimeoutMs": 15000
