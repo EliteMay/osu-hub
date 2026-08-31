@@ -11,7 +11,7 @@
     "scriptPath": "tools\\switch_audio_device.ps1",
     "customCommand": "",
     "command": "",
-    "memo": "v0.18.4ではSpeaker/スピーカー等の表示言語依存語を照合Tokenから除外し、FxSound等の安定した識別TokenでWindows Core Audio Fallback対象を特定する。失敗時は利用可能デバイス名もログへ出す。",
+    "memo": "v0.18.5ではSVCLに見えていてCore AudioのActive一覧にいないEndpointもAll stateで診断する。FxSoundを対象にした場合はFxSound.exeを起動し、DisabledならSVCL /Enableを試してActive化してから既定出力を再設定する。",
     "helperPath": "tools\\AudioSwitcher.cs",
     "soundVolumeViewPath": "",
     "nircmdPath": "tools\\nircmdc.exe",
@@ -55,6 +55,7 @@
     "osu!lazerは未設定でも一般的な保存先から自動検出する",
     "音声切替はSVCLモード推奨。まず「SVCLを自動取得」を押す",
     "音声デバイス一覧のNameまたはIDを切り替えたい音声名へ入れる",
+    "FxSoundを対象にする場合はv0.18.5がFxSound.exe起動とEndpoint Active化を自動試行する",
     "入力名が一覧に存在しない場合は音声切替を実行しない"
   ],
   "updateCheck": {
@@ -63,5 +64,5 @@
     "memo": "v0.18.2以降はGitHub Releasesのelectron-updater用Metadataで起動時に自動確認します。versionUrlは旧版互換用として残します。",
     "lastDownloadUrl": ""
   },
-  "appVersion": "0.18.4"
+  "appVersion": "0.18.5"
 }
