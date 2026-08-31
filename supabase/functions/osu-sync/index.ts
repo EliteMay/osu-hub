@@ -3,6 +3,7 @@ const TOKEN_KEY = 'default';
 const UPSTREAM_TIMEOUT_MS = 12000;
 const CACHE_TTL_MS = 60000;
 const ALLOWED_MODES = new Set(['osu', 'taiko', 'fruits', 'mania']);
+const ALLOWED_SCORE_TYPES = new Set(['recent', 'best']);
 const syncCache = new Map<string, { expiresAt: number; payload: unknown }>();
 
 function isAllowedOrigin(origin: string | null) {
@@ -164,6 +165,11 @@ function modeValue(value: unknown) {
   return ALLOWED_MODES.has(mode) ? mode : 'osu';
 }
 
+function scoreTypeValue(value: unknown) {
+  const scoreType = String(value ?? 'recent').trim().toLowerCase();
+  return ALLOWED_SCORE_TYPES.has(scoreType) ? scoreType : 'recent';
+}
+
 function safeNumber(value: unknown) {
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
@@ -259,9 +265,10 @@ async function sync(body: Record<string, unknown>, origin: string | null) {
   const user = String(body.user ?? '').trim().slice(0, 64);
   if (!user) return jsonResponse({ ok: false, error: 'osu! User ID or username is required.' }, 400, origin);
   const mode = modeValue(body.mode);
+  const scoreType = scoreTypeValue(body.scoreType);
   const limit = Math.min(100, Math.max(1, Number(body.limit) || 100));
-  const includeFails = body.includeFails !== false && body.includeFails !== 0 && body.includeFails !== '0';
-  const cacheKey = `${user.toLowerCase()}|${mode}|${limit}|${includeFails ? 1 : 0}`;
+  const includeFails = scoreType === 'recent' && body.includeFails !== false && body.includeFails !== 0 && body.includeFails !== '0';
+  const cacheKey = `${user.toLowerCase()}|${mode}|${scoreType}|${limit}|${includeFails ? 1 : 0}`;
   const cached = syncCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return jsonResponse(cached.payload, 200, origin);
 
@@ -277,19 +284,19 @@ async function sync(body: Record<string, unknown>, origin: string | null) {
     const userId = Number(userData?.id);
     if (!Number.isFinite(userId) || userId <= 0) return jsonResponse({ ok: false, error: 'osu! user could not be resolved.' }, 404, origin);
 
-    const scoreParams = new URLSearchParams({
-      include_fails: includeFails ? '1' : '0',
-      mode,
-      limit: String(limit),
-    });
-    const rawScores = await osuApiFetch(`/api/v2/users/${userId}/scores/recent?${scoreParams}`, tokenRow.access_token);
+    const scoreParams = new URLSearchParams({ mode, limit: String(limit) });
+    if (scoreType === 'recent') scoreParams.set('include_fails', includeFails ? '1' : '0');
+    const rawScores = await osuApiFetch(`/api/v2/users/${userId}/scores/${scoreType}?${scoreParams}`, tokenRow.access_token);
     const scores = Array.isArray(rawScores) ? rawScores.map(normalizeScore).filter((row) => /^\d+$/.test(row.osuScoreId)) : [];
     const stats = userData?.statistics ?? {};
     const payload = {
       ok: true,
       service: 'osu-hub-sync',
-      apiVersion: 1,
+      apiVersion: 2,
       provider: 'supabase-edge-function',
+      scoreType,
+      recentWindowHours: scoreType === 'recent' ? 24 : null,
+      includeFails,
       syncedAt: new Date().toISOString(),
       user: {
         id: userId,
@@ -322,11 +329,13 @@ async function health(origin: string | null) {
   return jsonResponse({
     ok: true,
     service: 'osu-hub-sync',
-    apiVersion: 1,
+    apiVersion: 2,
     provider: 'supabase-edge-function',
     configured,
     tokenExpiresAt: configured ? token.expires_at : null,
     browserOAuthRequired: false,
+    supportedScoreTypes: ['recent', 'best'],
+    recentWindowHours: 24,
   }, 200, origin);
 }
 
