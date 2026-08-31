@@ -33,7 +33,13 @@ Web Versionの正本は `data/site.json` の `siteVersion` です。Desktop Laun
 ### Verification
 
 - Supabase Edge Function Version 2 deploy: success
-- PR CI / main CI / Pages / Recent smoke / Best smokeはmerge後に確認
+- PR `Check web`: success
+- merge後main `Check web`: success
+- GitHub Pages build / deploy: success
+- Token refresh: success
+- Supabase health: success
+- Recent Plays smoke: success
+- Best Scores smoke: success
 - 実ブラウザBest 100件同期と5分自動蓄積は未確認
 
 ## Web 0.2.6 - 2026-08-31
