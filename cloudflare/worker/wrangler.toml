@@ -1,6 +1,0 @@
-name = "osu-hub-api"
-main = "src/index.js"
-compatibility_date = "2026-08-30"
-
-[vars]
-ALLOWED_ORIGINS = "https://elitemay.github.io,http://localhost:8000,http://127.0.0.1:8000"
