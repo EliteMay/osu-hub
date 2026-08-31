@@ -2,6 +2,36 @@
 
 Web Versionの正本は `data/site.json` の `siteVersion` です。Desktop Launcher Versionの正本は `package.json` の `version` です。
 
+## Web 0.2.8 - 2026-08-31
+
+### Changed
+
+- Desktop ToolsのDownload先をGitHub Releases latestへ変更
+- Setup Launcher `v0.17.0` の配布済み状態を画面へ反映
+- 未署名installer / Windows SmartScreen注意を明示
+- `web-project-guide` 採用Versionを1.3.0へ更新
+- CIへGitHub Release導線とWindows release workflowのStatic Guardを追加
+
+### Verification
+
+- Windows Actions build: success
+- Setup.exe存在・サイズ検証: success
+- Actions artifact upload: success
+- GitHub Release `v0.17.0`: published
+- Release asset `osu_setup_0.17.0_setup.exe`: uploaded
+- Release asset size: 78,366,257 bytes
+- Release asset SHA-256: `9fc9fde4a400a33dd456ed1e66574bec38457fc5e73cc5fdb646cb9a779250ef`
+- Windows実機固有の音声切替・外部exe起動: 未確認
+
+## Desktop 0.17.0 - 2026-08-31
+
+### Distribution
+
+- `osu Setup Launcher v0.17.0` の初回GitHub Releaseを公開
+- `osu_setup_0.17.0_setup.exe` をRelease assetとして配布開始
+- Desktop関連main変更時にWindows installerを自動build / verify / releaseするWorkflowへ更新
+- installerはコード署名なし
+
 ## Web 0.2.7 - 2026-08-31
 
 ### Added
