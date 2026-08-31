@@ -2,6 +2,7 @@ function canonicalDeviceId(value) {
   return String(value || "")
     .trim()
     .toLowerCase()
+    .replace(/[¥￥]/g, "\\")
     .replace(/\//g, "\\")
     .replace(/\\+/g, "\\");
 }
@@ -9,6 +10,7 @@ function canonicalDeviceId(value) {
 function matchText(value) {
   return String(value || "")
     .toLowerCase()
+    .replace(/[¥￥]/g, "\\")
     .replace(/[（）()\[\]{}\\/]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -33,17 +35,25 @@ function isSvclEndpointDevice(item) {
   const itemId = String(item.itemId || "");
   const direction = String(item.direction || "");
   const type = String(item.type || "");
-  const idText = `${id} ${itemId}`.toLowerCase();
+  const idText = canonicalDeviceId(`${id} ${itemId}`);
   const allText = `${name} ${id} ${itemId} ${direction} ${type}`.toLowerCase();
 
+  // SVCL mixes actual endpoints with per-application audio sessions. Never allow
+  // Application rows to become a Windows default playback target.
   if (/\\application\\/i.test(idText) || /(^|\s)application($|\s)/i.test(type)) return false;
 
   const render = /render|speaker|headphone|earphone|headset|スピーカー|ヘッドホン|イヤホン|再生/.test(allText);
   const capture = /capture|microphone|mic\b|マイク|録音/.test(allText);
+  if (!(name || id || itemId) || !render || capture) return false;
+
   const endpointPath = /\\device\\/i.test(idText) && /\\render\b/i.test(idText);
   const endpointType = /(^|\s)device($|\s)/i.test(type);
+  const renderDirection = /render|再生/i.test(direction);
 
-  return Boolean((name || id || itemId) && render && !capture && (endpointPath || endpointType));
+  // Some SVCL versions/providers leave Type blank or use a nonstandard label.
+  // Once Application sessions and Capture rows are excluded, a Render row with
+  // an endpoint-like ID is safe to keep as a candidate.
+  return Boolean(endpointPath || endpointType || renderDirection);
 }
 
 function scoreItem(item, target) {
