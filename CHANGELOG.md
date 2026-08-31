@@ -2,6 +2,40 @@
 
 Web Versionの正本は `data/site.json` の `siteVersion` です。Desktop Launcher Versionの正本は `package.json` の `version` です。
 
+## Web 0.2.7 - 2026-08-31
+
+### Added
+
+- Account Syncに `Recent Plays (24h)` / `Best Scores` 切替を追加
+- Best Scoresを最大100件取得
+- Account Sync画面を開いている間のRecent自動蓄積を追加
+- 自動蓄積の既定間隔を5分に設定
+- Resultへ `syncKinds` / `lastSyncedFrom` を追加し、Recent / Bestの取得経路を保持
+- Recent / Best両方のGitHub Actions E2E smoke testを追加
+
+### Changed
+
+- Supabase `osu-sync` API contractをVersion 2へ更新
+- `scoreType`未指定は後方互換で `recent`
+- `health` がRecent / Best対応状態とRecent 24h metadataを返す
+- Best選択中はFail設定を無効化
+- Recent 0件を正常状態として「直近24時間に対象プレイなし」と表示
+- Account画面にRecent / Bestそれぞれの最終同期時刻を表示
+
+### Compatibility
+
+- IndexedDB DB / Version / Store変更なし
+- Result ID `osu:<score id>` 変更なし
+- 既存Result / 手動メモを維持
+- Backup Schema変更なし
+- Electron Launcher変更なし
+
+### Verification
+
+- Supabase Edge Function Version 2 deploy: success
+- PR CI / main CI / Pages / Recent smoke / Best smokeはmerge後に確認
+- 実ブラウザBest 100件同期と5分自動蓄積は未確認
+
 ## Web 0.2.6 - 2026-08-31
 
 ### Fixed
@@ -20,25 +54,16 @@ Web Versionの正本は `data/site.json` の `siteVersion` です。Desktop Laun
 - Supabase Function source / migrationをGitHubへ追跡
 - CIをSupabase構成のStatic Validationへ変更
 
-### Compatibility
-
-- IndexedDB DB / Version / Store変更なし
-- Result ID `osu:<score id>` 変更なし
-- Backup Schema変更なし
-- Electron Launcher変更なし
-
 ### Verification
 
 - Supabase project作成: success
 - Token Store migration適用: success
 - `osu-sync` Edge Function deploy: success
-- PR #9 `Check web`: success
-- merge後main `Check web`: success
-- GitHub Pages deploy: success
-- `Refresh osu API Token`: success
-- Supabase `health configured=true`: success
-- Supabase → osu! API v2 Recent Scores smoke: success
-- 実ブラウザAccount Sync → Results → Stats: 未確認
+- PR / main CI: success
+- Token refresh E2E: success
+- Supabase health: success
+- Recent Scores smoke: success
+- 実ブラウザでEliteMayプロフィール同期: success
 
 ## Web 0.2.5 - 2026-08-30
 
@@ -46,15 +71,6 @@ Web Versionの正本は `data/site.json` の `siteVersion` です。Desktop Laun
 
 - Cloudflare WorkerからOAuthを避けた公開Web経路でも429になる問題に対し、Token発行処理をCloudflare外へ移動
 - Workerがosu! Client Secretや `/oauth/token` を保持・実行しなくても正式なosu! API v2を利用できる構成へ変更
-
-### Changed
-
-- GitHub Actions runnerでClient Credentials Tokenを発行
-- 発行TokenをGitHub Actions runnerからosu! API v2で検証
-- Access Tokenをmaskし、`OSU_ACCESS_TOKEN`だけをCloudflare Worker Secretへ保存
-- Client Credentials Tokenの24時間有効期間に対して12時間ごとの自動更新を追加
-- Worker Account Syncを `api-v2-preissued-token` modeへ変更
-- Worker deployとToken refreshの両方で `/health` + `/api/sync` end-to-end smoke testを実施
 
 ### Result
 
