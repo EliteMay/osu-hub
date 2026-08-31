@@ -2,6 +2,14 @@ name: Build Windows installer
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/build-windows.yml"
+      - "package.json"
+      - "src/**"
+      - "tools/**"
+      - "data/config.json"
+      - "version.json"
   push:
     branches:
       - main
@@ -17,7 +25,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: osu-setup-launcher-release
+  group: osu-setup-launcher-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -38,6 +46,13 @@ jobs:
 
       - name: Install dependencies
         run: npm install
+
+      - name: Check Electron JavaScript syntax
+        shell: pwsh
+        run: |
+          node --check src/main.js
+          node --check src/preload.js
+          node --check src/renderer/app.js
 
       - name: Build installer
         run: npm run build:win
@@ -67,6 +82,7 @@ jobs:
           if-no-files-found: error
 
       - name: Create or update GitHub Release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -74,10 +90,18 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $tag = "v$env:LAUNCHER_VERSION"
           $title = "osu Setup Launcher v$env:LAUNCHER_VERSION"
+          $meta = Get-Content 'version.json' -Raw | ConvertFrom-Json
+          $changeText = [string]$meta.releaseNotes
           $notes = @"
           ## osu Setup Launcher v$env:LAUNCHER_VERSION
 
-          Windows向け初回配布版です。
+          Windows向け配布版です。
+
+          ### 更新内容
+
+          $changeText
+
+          ### 主な機能
 
           - 音声出力切替
           - OpenTabletDriver起動
@@ -103,15 +127,16 @@ jobs:
           gh release upload $tag $env:INSTALLER_PATH --repo $env:GITHUB_REPOSITORY --clobber
           if ($LASTEXITCODE -ne 0) { throw "Failed to upload installer to release $tag" }
 
-      - name: Release summary
+      - name: Build summary
         shell: pwsh
         run: |
+          $releaseState = if ($env:GITHUB_EVENT_NAME -eq 'pull_request') { 'PR build only (not published)' } elseif ($env:GITHUB_REF -eq 'refs/heads/main') { "Release: https://github.com/$env:GITHUB_REPOSITORY/releases/tag/v$env:LAUNCHER_VERSION" } else { 'Build only' }
           @"
-          ## Windows installer release
+          ## Windows installer build
 
           - Version: $env:LAUNCHER_VERSION
           - Installer: osu_setup_${env:LAUNCHER_VERSION}_setup.exe
-          - Release: https://github.com/$env:GITHUB_REPOSITORY/releases/tag/v$env:LAUNCHER_VERSION
+          - Result: $releaseState
           - Code signing: disabled
           - Windows runtime behavior: requires real-device verification
           "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append

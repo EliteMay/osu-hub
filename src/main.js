@@ -305,7 +305,16 @@ function scoreItem(item, target) {
   const tokens = n.split(" ").filter((v) => v.length >= 2 && !["device", "render", "audio", "high", "definition"].includes(v));
   return tokens.length && tokens.every((v) => `${name} ${id} ${itemId}`.includes(v)) ? 60 : 0;
 }
-function isYes(v) { return /^(yes|true|1|y|はい)$/i.test(String(v || "").trim()); }
+function isYes(v) { return /^(yes|true|1|y|はい|default)$/i.test(String(v || "").trim()); }
+function cleanSvclValue(v) { return String(v || "").replace(/^\uFEFF/, "").trim(); }
+function svclValueMatches(item, value) {
+  const actual = matchText(cleanSvclValue(value));
+  if (!actual) return false;
+  return [item?.name, item?.id, item?.itemId].some((candidate) => {
+    const expected = matchText(candidate);
+    return expected && (expected === actual || expected.includes(actual) || actual.includes(expected));
+  });
+}
 
 function logsDir() {
   const local = path.join(APP_ROOT, "logs");
@@ -325,6 +334,43 @@ async function svclList(audio) {
   return { ...result, ok: true, message: "SVCL音声一覧を取得しました。", items: parseSvcl(result.stdout), savedPath, exe };
 }
 
+async function svclGetColumn(exe, itemName, columnName) {
+  const result = await runProcess(exe, ["/Stdout", "/GetColumnValue", itemName, columnName]);
+  const value = cleanSvclValue(result.stdout);
+  const noMatch = /no items found/i.test(`${result.stdout}\n${result.stderr}`);
+  return { ...result, ok: result.ok && !noMatch && Boolean(value), value };
+}
+
+async function verifySvclDefaultAliases(exe, item) {
+  const aliases = [
+    { role: "Console", alias: "DefaultRenderDevice" },
+    { role: "Multimedia", alias: "DefaultRenderDeviceMulti" },
+    { role: "Communications", alias: "DefaultRenderDeviceComm" }
+  ];
+  const checks = [];
+  for (const entry of aliases) {
+    let query = await svclGetColumn(exe, entry.alias, "Command-Line Friendly ID");
+    if (!query.ok || !svclValueMatches(item, query.value)) {
+      const byName = await svclGetColumn(exe, entry.alias, "Name");
+      if (byName.ok) query = byName;
+    }
+    checks.push({ ...entry, ok: query.ok && svclValueMatches(item, query.value), value: query.value });
+  }
+  const consoleOk = checks.find((v) => v.role === "Console")?.ok;
+  const multimediaOk = checks.find((v) => v.role === "Multimedia")?.ok;
+  return {
+    ok: Boolean(consoleOk || multimediaOk),
+    checks,
+    details: checks.map((v) => `${v.role}: ${v.value || "(unavailable)"}${v.ok ? " [match]" : ""}`).join("\n")
+  };
+}
+
+function switchPowerShell(audio) {
+  const script = resolveAppPath(audio?.scriptPath || "tools\\switch_audio_device.ps1");
+  if (!safeExists(script)) return Promise.resolve({ ok: false, message: `音声切替スクリプトが見つかりません: ${script}` });
+  return runProcess("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "-DeviceName", String(audio?.deviceName || "")]).then((r) => ({ ...r, message: r.ok ? "Windows標準Fallbackで既定デバイスまで確認しました。" : `Windows標準Fallback失敗: ${r.message}` }));
+}
+
 async function switchSvcl(audio) {
   const target = String(audio?.deviceName || "").trim();
   if (!target) return { ok: false, message: "音声デバイス名が未設定です。" };
@@ -337,12 +383,32 @@ async function switchSvcl(audio) {
   const targetValue = best.item.id || best.item.itemId || best.item.name;
   const set = await runProcess(before.exe, ["/Stdout", "/SetDefault", targetValue, "all"]);
   if (!set.ok || /no items found/i.test(`${set.stdout}\n${set.stderr}`)) return { ok: false, message: "SVCLのSetDefaultで対象に反映されませんでした。", stdout: `matched: ${best.item.name} | ${targetValue}\n${set.stdout || ""}`, stderr: set.stderr || "" };
-  await sleep(250);
+
+  await sleep(300);
+  const directVerify = await verifySvclDefaultAliases(before.exe, best.item);
+  if (directVerify.ok) {
+    return { ok: true, message: `音声出力を切り替えました: ${best.item.name}`, stdout: `verified by Windows default aliases\n${directVerify.details}\nmatched: ${best.item.name} | ${targetValue}` };
+  }
+
   const after = await svclList(audio);
   const matchedAfter = after.items?.map((item) => ({ item, score: scoreItem(item, targetValue) })).sort((a, b) => b.score - a.score)[0]?.item;
-  const verified = matchedAfter && [matchedAfter.def, matchedAfter.multi, matchedAfter.comm].some(isYes);
-  if (!verified) return { ok: false, verifyNeeded: true, message: `音声切替コマンドは実行しましたが、既定デバイスへの変更を自動確認できませんでした: ${best.item.name}`, stdout: `matched: ${best.item.name} | ${targetValue}\n${set.stdout || ""}` };
-  return { ok: true, message: `音声出力を切り替えました: ${best.item.name}`, stdout: `verified: ${best.item.name} | ${targetValue}` };
+  const csvVerified = matchedAfter && [matchedAfter.def, matchedAfter.multi, matchedAfter.comm].some(isYes);
+  if (csvVerified) {
+    return { ok: true, message: `音声出力を切り替えました: ${best.item.name}`, stdout: `verified by SVCL CSV fallback\n${directVerify.details}\nmatched: ${best.item.name} | ${targetValue}` };
+  }
+
+  const fallback = await switchPowerShell({ ...audio, deviceName: best.item.name || target });
+  if (fallback.ok) {
+    return { ok: true, message: `音声出力を切り替えました: ${best.item.name}（Windows標準Fallbackで確認）`, stdout: `SVCL command matched: ${best.item.name} | ${targetValue}\n${directVerify.details}\n${fallback.stdout || ""}` };
+  }
+
+  return {
+    ok: false,
+    verifyNeeded: true,
+    message: `音声切替コマンドは実行しましたが、Windows側の既定デバイスを確認できませんでした: ${best.item.name}`,
+    stdout: `matched: ${best.item.name} | ${targetValue}\n${set.stdout || ""}\n${directVerify.details}\nFallback: ${fallback.message}`,
+    stderr: fallback.stderr || ""
+  };
 }
 
 async function switchNirCmd(audio) {
@@ -354,11 +420,6 @@ async function switchNirCmd(audio) {
   return { ok: result.ok, message: result.ok ? `NirCmdコマンドを実行しました: ${target}` : `NirCmd失敗: ${result.message}`, stdout: result.stdout, stderr: result.stderr };
 }
 
-function switchPowerShell(audio) {
-  const script = resolveAppPath(audio?.scriptPath || "tools\\switch_audio_device.ps1");
-  if (!safeExists(script)) return Promise.resolve({ ok: false, message: `音声切替スクリプトが見つかりません: ${script}` });
-  return runProcess("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "-DeviceName", String(audio?.deviceName || "")]).then((r) => ({ ...r, message: r.ok ? "標準モードの音声切替を実行しました。" : `標準モード失敗: ${r.message}` }));
-}
 function switchCustom(audio) {
   return new Promise((resolve) => {
     const command = String(audio?.customCommand || audio?.command || "").trim();

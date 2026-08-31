@@ -9,6 +9,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const json = (file) => JSON.parse(read(file));
 const fail = (message) => errors.push(message);
 const warn = (message) => warnings.push(message);
+const escapeRegex = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const site = json('data/site.json');
 const projectMeta = json('project-meta.json');
@@ -115,7 +116,8 @@ if (/id=["'](?:clientId|clientSecret|osuClientId|osuClientSecret)["']/i.test(acc
 
 const toolsHtml = read('pages/tools.html');
 if (!/href=["']https:\/\/github\.com\/EliteMay\/osu-hub\/releases\/latest["']/.test(toolsHtml)) fail('Desktop Tools download button must point to the latest GitHub Release.');
-if (!/配布中:\s*v0\.17\.0/.test(toolsHtml)) fail('Desktop Tools must show the published launcher version.');
+const launcherVersionPattern = new RegExp(`(?:配布中|配布版):\\s*v${escapeRegex(site.launcher?.version)}`);
+if (!launcherVersionPattern.test(toolsHtml)) fail('Desktop Tools must show the current published launcher version from site metadata.');
 if (/Setup\.exeの初回配布は未確認/.test(toolsHtml)) fail('Desktop Tools must not show the old unreleased notice after publication.');
 
 const refreshWorkflow = read('.github/workflows/refresh-osu-token.yml');
@@ -131,8 +133,17 @@ if (!/supabase\/functions\/\*\*/.test(checkWorkflow)) fail('Check web path filte
 
 if (!fs.existsSync(path.join(root, '.github/workflows/build-windows.yml'))) fail('Windows build/release workflow must exist.');
 const windowsWorkflow = fs.existsSync(path.join(root, '.github/workflows/build-windows.yml')) ? read('.github/workflows/build-windows.yml') : '';
-for (const marker of ['contents: write', 'Verify installer', 'gh release create', 'gh release upload', 'osu_setup_${version}_setup.exe']) {
-  if (windowsWorkflow && !windowsWorkflow.includes(marker)) fail(`build-windows.yml: missing release guard ${marker}.`);
+for (const marker of ['pull_request:', 'contents: write', 'Check Electron JavaScript syntax', 'node --check src/main.js', 'Verify installer', "github.event_name != 'pull_request'", 'gh release create', 'gh release upload', 'osu_setup_${version}_setup.exe']) {
+  if (windowsWorkflow && !windowsWorkflow.includes(marker)) fail(`build-windows.yml: missing release/build guard ${marker}.`);
+}
+
+const desktopMain = read('src/main.js');
+for (const marker of ['verifySvclDefaultAliases', 'DefaultRenderDevice', 'DefaultRenderDeviceMulti', 'DefaultRenderDeviceComm', '/GetColumnValue', 'Windows標準Fallback']) {
+  if (!desktopMain.includes(marker)) fail(`src/main.js: missing audio verification guard ${marker}.`);
+}
+const audioFallback = read('tools/switch_audio_device.ps1');
+for (const marker of ['SetDefaultRenderDevice', 'GetRenderDevices', 'VERIFIED_DEFAULT', 'Default verification failed']) {
+  if (!audioFallback.includes(marker)) fail(`switch_audio_device.ps1: missing fallback verification guard ${marker}.`);
 }
 
 const publicFiles = ['index.html', ...htmlFiles.filter((file) => file !== 'index.html'), ...webJsFiles, 'data/site.json'];
@@ -163,4 +174,4 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log(`Validated ${htmlFiles.length} HTML files, project metadata, versions, launcher release guards, Recent/Best Supabase Account Sync guards, auto accumulation, token refresh policy, stable runtime paths, import recovery guards, and responsive/accessibility/security rules: OK`);
+console.log(`Validated ${htmlFiles.length} HTML files, project metadata, versions, launcher release/audio verification guards, Recent/Best Supabase Account Sync guards, auto accumulation, token refresh policy, stable runtime paths, import recovery guards, and responsive/accessibility/security rules: OK`);

@@ -82,5 +82,23 @@ try {
   exit 13
 }
 
+Start-Sleep -Milliseconds 250
+
+try {
+  $afterDevices = [OsuSetupAudio.AudioSwitcher]::GetRenderDevices()
+  $verified = $afterDevices | Where-Object {
+    $_.IsDefault -and [String]::Equals($_.Id, $matched.Id, [StringComparison]::OrdinalIgnoreCase)
+  } | Select-Object -First 1
+} catch {
+  Write-Error ("Default verification failed: " + $_.Exception.Message)
+  exit 15
+}
+
+if ($null -eq $verified) {
+  Write-Error ("Default verification failed: target is not the current multimedia default: " + $matched.Name)
+  exit 16
+}
+
 Write-Output ("SWITCHED_TO: " + $matched.Name)
+Write-Output ("VERIFIED_DEFAULT: " + $verified.Name)
 exit 0
