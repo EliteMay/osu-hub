@@ -32,7 +32,13 @@ Web Versionの正本は `data/site.json` の `siteVersion` です。Desktop Laun
 - Supabase project作成: success
 - Token Store migration適用: success
 - `osu-sync` Edge Function deploy: success
-- PR / main CI、Token refresh E2E、実ブラウザAccount Syncはmerge後に確認
+- PR #9 `Check web`: success
+- merge後main `Check web`: success
+- GitHub Pages deploy: success
+- `Refresh osu API Token`: success
+- Supabase `health configured=true`: success
+- Supabase → osu! API v2 Recent Scores smoke: success
+- 実ブラウザAccount Sync → Results → Stats: 未確認
 
 ## Web 0.2.5 - 2026-08-30
 
