@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
-const { canonicalDeviceId, isSvclEndpointDevice, chooseSvclDevice } = require('../src/audio-matcher.js');
+const { canonicalDeviceId, endpointProvider, isSvclEndpointDevice, chooseSvclDevice } = require('../src/audio-matcher.js');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const fail = (message) => {
   console.error(`Audio interop validation failed: ${message}`);
@@ -82,6 +82,8 @@ for (const marker of [
   'isSvclEndpointDevice',
   'chooseSvclDevice',
   'stateBonus',
+  'endpointProvider',
+  'provider-fallback',
   'ambiguous',
   'replace(/[¥￥]/g'
 ]) {
@@ -164,6 +166,33 @@ if (!japaneseYenHighDefinition.ok || japaneseYenHighDefinition.item?.name !== '�
 if (canonicalDeviceId('High Definition Audio Device￥Device￥Speakers￥Render') !== canonicalDeviceId('High Definition Audio Device\\Device\\Speakers\\Render')) {
   fail('Full-width yen separators must normalize to Windows backslashes.');
 }
+if (endpointProvider('High Definition Audio Device￥Device￥Speakers￥Render') !== 'high definition audio device') {
+  fail('Endpoint provider extraction must work after Japanese separator normalization.');
+}
+
+const staleEndpointFixtures = [
+  {
+    name: 'スピーカー',
+    id: 'High Definition Audio Device\\Device\\Speakers Realtek\\Render',
+    itemId: '{speaker-current-endpoint}',
+    direction: 'Render',
+    type: 'Device',
+    state: 'Active'
+  },
+  {
+    name: 'ヘッドホン',
+    id: 'High Definition Audio Device\\Device\\Headphones\\Render',
+    itemId: '{headphone-stale-endpoint}',
+    direction: 'Render',
+    type: 'Device',
+    state: 'NotPresent'
+  },
+  observedFixtures[0]
+];
+const staleEndpointSelection = chooseSvclDevice(staleEndpointFixtures, 'High Definition Audio Device\\Device\\Speakers\\Render');
+if (!staleEndpointSelection.ok || staleEndpointSelection.item?.name !== 'スピーカー' || staleEndpointSelection.matchedBy !== 'provider-fallback') {
+  fail('A stale or guessed endpoint ID must safely fall back to the same provider and select its unique active render endpoint.');
+}
 
 const blankTypeRenderEndpoint = {
   name: 'スピーカー',
@@ -213,6 +242,10 @@ const ambiguousFixtures = [
 const ambiguous = chooseSvclDevice(ambiguousFixtures, 'Same Provider');
 if (ambiguous.ok || ambiguous.reason !== 'ambiguous') {
   fail('Equal-strength endpoint matches must stop as ambiguous instead of selecting arbitrarily.');
+}
+const ambiguousStaleId = chooseSvclDevice(ambiguousFixtures, 'Same Provider\\Device\\OldSpeakers\\Render');
+if (ambiguousStaleId.ok || ambiguousStaleId.reason !== 'ambiguous-provider') {
+  fail('Provider fallback must also stop when multiple active endpoints from the provider are equally plausible.');
 }
 
 console.log('Audio interop validation: OK');
