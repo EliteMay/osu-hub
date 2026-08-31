@@ -4,6 +4,10 @@
   const $$ = (selector, parent = document) => Array.from(parent.querySelectorAll(selector));
   const SETTINGS_KEY = 'osuAccount';
   const DEFAULT_TIMEOUT_MS = 15000;
+  const DEFAULT_AUTO_SYNC_MINUTES = 5;
+  const SCORE_TYPES = new Set(['recent', 'best']);
+  let syncing = false;
+  let autoTimer = null;
 
   const esc = (value = '') => String(value).replace(/[&<>'"]/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
@@ -13,6 +17,7 @@
     const el = document.createElement('div');
     el.className = `toast${error ? ' error' : ''}`;
     el.textContent = message;
+    el.setAttribute('role', error ? 'alert' : 'status');
     document.body.append(el);
     setTimeout(() => el.remove(), 3000);
   }
@@ -60,6 +65,21 @@
     }
   }
 
+  function scoreTypeValue(value) {
+    const type = String(value || 'recent').toLowerCase();
+    return SCORE_TYPES.has(type) ? type : 'recent';
+  }
+
+  function scoreTypeLabel(type) {
+    return scoreTypeValue(type) === 'best' ? 'Best Scores' : 'Recent Plays (24h)';
+  }
+
+  function fmtDateTime(value) {
+    if (!value) return '--';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? '--' : date.toLocaleString('ja-JP');
+  }
+
   async function fetchJson(url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -94,17 +114,23 @@
       DB.get('settings', SETTINGS_KEY),
       loadSiteDefaults(),
     ]);
+    const autoSyncMinMinutes = Math.min(60, Math.max(1, number(site?.osuApi?.autoSyncMinMinutes, DEFAULT_AUTO_SYNC_MINUTES)));
     return {
       key: SETTINGS_KEY,
       endpointUrl: saved?.endpointUrl || site?.osuApi?.endpointUrl || '',
       user: saved?.user || '',
       mode: saved?.mode || 'osu',
+      scoreType: scoreTypeValue(saved?.scoreType || 'recent'),
       limit: number(saved?.limit, site?.osuApi?.syncLimit || 100) || 100,
       includeFails: saved?.includeFails ?? site?.osuApi?.includeFails ?? true,
+      autoSyncOnOpen: saved?.autoSyncOnOpen ?? site?.osuApi?.autoSyncOnOpen ?? true,
+      autoSyncMinMinutes,
       requestTimeoutMs: number(site?.osuApi?.requestTimeoutMs, DEFAULT_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS,
       resolvedUserId: saved?.resolvedUserId || '',
       resolvedUsername: saved?.resolvedUsername || '',
       lastSyncAt: saved?.lastSyncAt || '',
+      lastRecentSyncAt: saved?.lastRecentSyncAt || '',
+      lastBestSyncAt: saved?.lastBestSyncAt || '',
     };
   }
 
@@ -117,8 +143,10 @@
       endpointUrl: String($('#endpointUrl').value || '').trim(),
       user: String($('#osuUser').value || '').trim(),
       mode: $('#osuMode').value || 'osu',
+      scoreType: scoreTypeValue($('#scoreType').value),
       limit: Math.min(100, Math.max(1, number($('#syncLimit').value, 100))),
       includeFails: $('#includeFails').value !== '0',
+      autoSyncOnOpen: $('#autoSyncOnOpen').value !== '0',
     };
     if (value.endpointUrl) value.endpointUrl = normalizeEndpointUrl(value.endpointUrl);
     delete value.workerUrl;
@@ -151,6 +179,10 @@
     }
     if (payload.browserOAuthRequired !== false) {
       throw new Error('Sync APIがブラウザSecret不要の構成になっていません。');
+    }
+    const supported = Array.isArray(payload.supportedScoreTypes) ? payload.supportedScoreTypes : [];
+    if (!supported.includes('recent') || !supported.includes('best')) {
+      throw new Error('Sync APIがRecent / Best両方に対応した最新版ではありません。');
     }
     return payload;
   }
@@ -201,6 +233,8 @@
     if (!payload || typeof payload !== 'object' || payload.provider !== 'supabase-edge-function' || !Array.isArray(payload.scores) || !payload.user || typeof payload.user !== 'object') {
       throw new Error('Supabase Sync APIの同期応答形式が正しくありません。');
     }
+    const scoreType = scoreTypeValue(payload.scoreType);
+    if (payload.scoreType !== scoreType) throw new Error('Sync APIのscoreTypeが正しくありません。');
     if (payload.scores.length > 100) throw new Error('Sync APIから上限を超えるスコアが返されました。');
     const userId = Number(payload.user.id);
     if (!Number.isFinite(userId) || userId <= 0 || !String(payload.user.username || '').trim()) {
@@ -208,6 +242,7 @@
     }
     return {
       apiVersion: Number(payload.apiVersion || 0),
+      scoreType,
       syncedAt: text(payload.syncedAt || new Date().toISOString(), 64),
       user: {
         id: userId,
@@ -241,11 +276,14 @@
     }
   }
 
-  function renderPreview(scores) {
+  function renderPreview(scores, scoreType) {
     const host = $('#syncPreview');
+    $('#previewTitle').textContent = `${scoreTypeLabel(scoreType)} の取得結果`;
     if (!scores.length) {
       host.className = 'list-empty';
-      host.textContent = '取得したリザルトはありません。';
+      host.textContent = scoreType === 'recent'
+        ? '直近24時間に対象プレイはありません。保存済みResultsはそのまま残ります。'
+        : 'Best Scoresを取得できませんでした。';
       return;
     }
     host.className = 'data-list';
@@ -272,9 +310,13 @@
 
     for (const score of payload.scores) {
       const previous = byId.get(score.id);
+      const syncKinds = new Set(Array.isArray(previous?.syncKinds) ? previous.syncKinds.map(scoreTypeValue) : []);
+      syncKinds.add(payload.scoreType);
       const row = {
         ...(previous || {}),
         ...score,
+        syncKinds: [...syncKinds],
+        lastSyncedFrom: payload.scoreType,
         createdAt: previous?.createdAt || score.playedAt || payload.syncedAt || new Date().toISOString(),
         importedAt: new Date().toISOString(),
         note: previous?.note || '',
@@ -288,6 +330,27 @@
     return { added, updated };
   }
 
+  function updateTypeUi() {
+    const type = scoreTypeValue($('#scoreType').value);
+    const failSelect = $('#includeFails');
+    const failHelp = $('#includeFailsHelp');
+    const button = $('#syncNow');
+    const typeHelp = $('#scoreTypeHelp');
+    const isBest = type === 'best';
+    failSelect.disabled = isBest;
+    failHelp.textContent = isBest ? 'Best Scoresは成功スコアのみなので、この設定は使用しません。' : 'Recent Playsだけに適用。Failも練習履歴として蓄積できます。';
+    typeHelp.textContent = isBest
+      ? '自己ベスト上位を最大100件取得。古いベストもResultsへ追加できます。'
+      : 'osu!のRecent Playsは直近24時間。新しいScore IDだけResultsへ追加されます。';
+    button.textContent = isBest ? 'Bestを同期' : 'Recentを同期';
+  }
+
+  function updateSyncTimes(settings) {
+    $('#lastSync').textContent = fmtDateTime(settings.lastSyncAt);
+    $('#lastRecentSync').textContent = fmtDateTime(settings.lastRecentSyncAt);
+    $('#lastBestSync').textContent = fmtDateTime(settings.lastBestSyncAt);
+  }
+
   async function testConnection() {
     const button = $('#testService');
     button.disabled = true;
@@ -295,7 +358,7 @@
       const settings = await saveSettings();
       setStatus('Supabase Sync APIへ接続しています…');
       validateHealth(await serviceFetch(settings, { action: 'health' }));
-      setStatus('接続OK。osu! API v2の同期Tokenを利用できます。', 'success');
+      setStatus('接続OK。Recent PlaysとBest Scoresを同期できます。', 'success');
       toast('接続確認に成功しました。');
     } catch (error) {
       setStatus(error.message || '接続確認に失敗しました。', 'notice');
@@ -305,42 +368,73 @@
     }
   }
 
-  async function syncNow() {
+  async function syncNow(options = {}) {
+    if (syncing) return;
+    syncing = true;
     const button = $('#syncNow');
     button.disabled = true;
+    const automatic = options.automatic === true;
     try {
       const settings = await saveSettings();
       if (!settings.user) throw new Error('osu! User IDまたはユーザー名を入力してください。');
-      setStatus('osu!から最近のプレイを取得しています…');
+      const scoreType = scoreTypeValue(options.scoreType || settings.scoreType);
+      const label = scoreTypeLabel(scoreType);
+      setStatus(`${label}をosu!から取得しています…`);
       const payload = validateSyncPayload(await serviceFetch(settings, {
         action: 'sync',
         user: settings.user,
         mode: settings.mode,
+        scoreType,
         limit: settings.limit,
-        includeFails: settings.includeFails,
+        includeFails: scoreType === 'recent' ? settings.includeFails : false,
       }));
       const counts = await importScores(payload);
-      const saved = await saveSettings({
+      const syncAt = payload.syncedAt || new Date().toISOString();
+      const extra = {
         resolvedUserId: payload.user.id,
         resolvedUsername: payload.user.username,
-        lastSyncAt: payload.syncedAt || new Date().toISOString(),
-      });
+        lastSyncAt: syncAt,
+      };
+      if (scoreType === 'recent') extra.lastRecentSyncAt = syncAt;
+      else extra.lastBestSyncAt = syncAt;
+      const saved = await saveSettings(extra);
 
       renderUser(payload.user);
-      renderPreview(payload.scores);
+      renderPreview(payload.scores, scoreType);
       $('#savedAccount').textContent = payload.user.username || settings.user;
       $('#fetchedCount').textContent = payload.scores.length;
       $('#addedCount').textContent = counts.added;
       $('#updatedCount').textContent = counts.updated;
-      $('#lastSync').textContent = new Date(saved.lastSyncAt).toLocaleString('ja-JP');
-      setStatus(`同期完了: ${payload.scores.length}件取得 / ${counts.added}件追加 / ${counts.updated}件更新`, 'success');
-      toast('osu!のリザルトを同期しました。');
+      updateSyncTimes(saved);
+
+      if (scoreType === 'recent' && payload.scores.length === 0) {
+        setStatus('Recent Plays (24h): 0件。直近24時間に対象プレイはありません。保存済み履歴は維持しています。', 'success');
+      } else {
+        setStatus(`${label}: ${payload.scores.length}件取得 / ${counts.added}件追加 / ${counts.updated}件更新`, 'success');
+      }
+      if (!automatic || counts.added > 0) toast(automatic ? `Recentを自動同期しました。${counts.added}件追加。` : `${label}を同期しました。`);
     } catch (error) {
       setStatus(error.message || '同期に失敗しました。設定を確認して再試行してください。', 'notice');
-      toast(error.message || '同期に失敗しました。', true);
+      if (!automatic) toast(error.message || '同期に失敗しました。', true);
     } finally {
+      syncing = false;
       button.disabled = false;
+      updateTypeUi();
     }
+  }
+
+  function isAutoSyncDue(settings) {
+    if (!settings.autoSyncOnOpen || !settings.user || !settings.endpointUrl) return false;
+    if (!settings.lastRecentSyncAt) return true;
+    const last = new Date(settings.lastRecentSyncAt).getTime();
+    if (!Number.isFinite(last)) return true;
+    return Date.now() - last >= settings.autoSyncMinMinutes * 60 * 1000;
+  }
+
+  async function maybeAutoSync() {
+    if (document.visibilityState !== 'visible' || syncing) return;
+    const settings = await getSettings();
+    if (isAutoSyncDue(settings)) await syncNow({ scoreType: 'recent', automatic: true });
   }
 
   async function init() {
@@ -348,10 +442,14 @@
     $('#endpointUrl').value = settings.endpointUrl;
     $('#osuUser').value = settings.user;
     $('#osuMode').value = settings.mode;
+    $('#scoreType').value = settings.scoreType;
     $('#syncLimit').value = settings.limit;
     $('#includeFails').value = settings.includeFails ? '1' : '0';
-    $('#lastSync').textContent = settings.lastSyncAt ? new Date(settings.lastSyncAt).toLocaleString('ja-JP') : '--';
+    $('#autoSyncOnOpen').value = settings.autoSyncOnOpen ? '1' : '0';
+    $('#autoSyncHelp').textContent = `Account Syncを開いている間、Recentが${settings.autoSyncMinMinutes}分以上空いていれば自動同期します。ブラウザを閉じている間は動作しません。`;
     $('#savedAccount').textContent = settings.resolvedUsername || settings.user || '--';
+    updateSyncTimes(settings);
+    updateTypeUi();
 
     $('#accountForm').addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -362,13 +460,28 @@
         toast(error.message || '設定の保存に失敗しました。', true);
       }
     });
+    $('#scoreType').addEventListener('change', updateTypeUi);
     $('#testService').addEventListener('click', testConnection);
-    $('#syncNow').addEventListener('click', syncNow);
+    $('#syncNow').addEventListener('click', () => syncNow());
 
     $$('.nav a').forEach((a) => {
       if ((a.getAttribute('href') || '').includes('account.html')) a.classList.add('active');
     });
+
+    if (settings.autoSyncOnOpen && settings.user) {
+      setTimeout(() => maybeAutoSync().catch(() => {}), 300);
+      autoTimer = setInterval(() => maybeAutoSync().catch(() => {}), 60000);
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') maybeAutoSync().catch(() => {});
+      });
+    } else {
+      setStatus('Recent Playsは直近24時間、Best Scoresは上位100件まで取得できます。');
+    }
   }
+
+  window.addEventListener('beforeunload', () => {
+    if (autoTimer) clearInterval(autoTimer);
+  });
 
   init().catch((error) => {
     setStatus(error.message || '初期化に失敗しました。再読み込みしてください。', 'notice');
