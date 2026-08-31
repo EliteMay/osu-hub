@@ -11,7 +11,7 @@
     "scriptPath": "tools\\switch_audio_device.ps1",
     "customCommand": "",
     "command": "",
-    "memo": "v17ではSVCLの一覧から実在する項目を照合してから切り替える。見つからない場合は実行せず、音声デバイス一覧を表示する。",
+    "memo": "v18ではSVCLで切替後、DefaultRenderDevice系エイリアスからWindows既定出力を直接確認する。確認できない場合はPolicyConfigのWindows標準Fallbackで切替・再確認する。",
     "helperPath": "tools\\AudioSwitcher.cs",
     "soundVolumeViewPath": "",
     "nircmdPath": "tools\\nircmdc.exe",
@@ -63,5 +63,5 @@
     "memo": "更新確認はosu-hubのversion.jsonを参照します。自動上書き更新は行いません。",
     "lastDownloadUrl": ""
   },
-  "appVersion": "0.17.0"
+  "appVersion": "0.18.0"
 }
