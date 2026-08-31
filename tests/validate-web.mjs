@@ -32,6 +32,12 @@ const endpoint = String(site.osuApi?.endpointUrl || '');
 if (!/^https:\/\/[^/]+\.supabase\.co\/functions\/v1\/osu-sync$/.test(endpoint)) fail('osuApi.endpointUrl must be the HTTPS Supabase osu-sync Edge Function URL.');
 if ('workerUrl' in (site.osuApi || {})) fail('Legacy Cloudflare workerUrl must not remain in data/site.json.');
 if ('clientSecret' in (site.osuApi || {}) || 'secret' in (site.osuApi || {})) fail('data/site.json must not contain secret fields.');
+const scoreTypes = Array.isArray(site.osuApi?.scoreTypes) ? site.osuApi.scoreTypes : [];
+if (!scoreTypes.includes('recent') || !scoreTypes.includes('best')) fail('osuApi.scoreTypes must include recent and best.');
+if (Number(site.osuApi?.recentWindowHours) !== 24) fail('osuApi.recentWindowHours must be 24.');
+if (site.osuApi?.autoSyncOnOpen !== true) fail('osuApi.autoSyncOnOpen must default to true.');
+const autoMinutes = Number(site.osuApi?.autoSyncMinMinutes);
+if (!Number.isFinite(autoMinutes) || autoMinutes < 1 || autoMinutes > 60) fail('osuApi.autoSyncMinMinutes must be between 1 and 60.');
 const timeout = Number(site.osuApi?.requestTimeoutMs);
 if (!Number.isFinite(timeout) || timeout < 3000 || timeout > 60000) fail('osuApi.requestTimeoutMs must be between 3000 and 60000.');
 
@@ -91,20 +97,22 @@ for (const marker of ['recoverySnapshot', 'verifyImported', 'replaceAllStores', 
 if (!/const\s+SCHEMA_VERSION\s*=\s*1\b/.test(storageSource)) fail('js/storage.js: SCHEMA_VERSION must be explicit.');
 
 const accountSyncSource = read('js/osu-sync.js');
-for (const marker of ['endpointUrl', 'serviceFetch', "action: 'health'", "action: 'sync'", 'supabase-edge-function', 'browserOAuthRequired']) {
+for (const marker of ['endpointUrl', 'serviceFetch', "action: 'health'", "action: 'sync'", 'supabase-edge-function', 'browserOAuthRequired', 'scoreType', 'autoSyncOnOpen', 'lastRecentSyncAt', 'lastBestSyncAt', 'syncKinds']) {
   if (!accountSyncSource.includes(marker)) fail(`js/osu-sync.js: missing Supabase sync guard ${marker}.`);
 }
+if (!/Recent Plays \(24h\)/.test(accountSyncSource) || !/Best Scores/.test(accountSyncSource)) fail('Account Sync runtime must distinguish Recent Plays (24h) and Best Scores.');
 if (/Cloudflare Worker|workerFetch\(|normalizeWorkerUrl\(/.test(accountSyncSource)) fail('js/osu-sync.js must not use the legacy Cloudflare Worker runtime.');
 if (/clientSecret|OSU_CLIENT_SECRET/.test(accountSyncSource)) fail('Browser Account Sync runtime must not contain osu! Client Secret handling.');
 
 const accountHtml = read('pages/account.html');
 if (!/ブラウザへのosu! Secret入力は不要/.test(accountHtml)) fail('Account Sync page must explain that browser secret input is not required.');
 if (!/Supabase Edge Function/.test(accountHtml)) fail('Account Sync page must identify the Supabase provider.');
+if (!/Recent Plays \(24h\)/.test(accountHtml) || !/Best Scores/.test(accountHtml) || !/自動蓄積/.test(accountHtml)) fail('Account Sync page must expose Recent 24h, Best, and automatic accumulation controls.');
 if (/Cloudflare Worker/.test(accountHtml)) fail('Account Sync page must not present Cloudflare as the active provider.');
 if (/id=["'](?:clientId|clientSecret|osuClientId|osuClientSecret)["']/i.test(accountHtml)) fail('Account Sync page must not expose Client ID / Secret input fields.');
 
 const refreshWorkflow = read('.github/workflows/refresh-osu-token.yml');
-for (const marker of ['OSU_CLIENT_ID', 'OSU_CLIENT_SECRET', 'data/site.json', 'action: "refresh"', 'action":"health', 'action":"sync', 'supabase-edge-function']) {
+for (const marker of ['OSU_CLIENT_ID', 'OSU_CLIENT_SECRET', 'data/site.json', 'action: "refresh"', 'action":"health', 'supabase-edge-function', 'scoreType":"recent', 'scoreType":"best', 'Recent Plays smoke', 'Best Scores smoke']) {
   if (!refreshWorkflow.includes(marker)) fail(`refresh-osu-token.yml: missing Supabase token lifecycle guard ${marker}.`);
 }
 if (!/cron:\s*["']17 \*\/12 \* \* \*["']/.test(refreshWorkflow)) fail('osu! token refresh workflow must run every 12 hours.');
@@ -125,7 +133,7 @@ if (fs.existsSync(path.join(root, 'cloudflare/worker'))) fail('Legacy Cloudflare
 
 if (!fs.existsSync(path.join(root, 'supabase/functions/osu-sync/index.ts'))) fail('Supabase Edge Function source must be tracked in GitHub.');
 const functionSource = fs.existsSync(path.join(root, 'supabase/functions/osu-sync/index.ts')) ? read('supabase/functions/osu-sync/index.ts') : '';
-for (const marker of ['osu_api_tokens', 'SUPABASE_SERVICE_ROLE_KEY', 'action === \'refresh\'', 'action === \'sync\'', 'action === \'health\'', 'CACHE_TTL_MS = 60000', 'Retry-After']) {
+for (const marker of ['osu_api_tokens', 'SUPABASE_SERVICE_ROLE_KEY', 'action === \'refresh\'', 'action === \'sync\'', 'action === \'health\'', 'CACHE_TTL_MS = 60000', 'Retry-After', 'ALLOWED_SCORE_TYPES', "['recent', 'best']", '/scores/${scoreType}', 'supportedScoreTypes', 'recentWindowHours']) {
   if (functionSource && !functionSource.includes(marker)) fail(`Supabase osu-sync function: missing guard ${marker}.`);
 }
 if (functionSource && /console\.log\([^\n]*(clientSecret|accessToken)/.test(functionSource)) fail('Supabase function must not log OAuth secrets or access tokens.');
@@ -142,4 +150,4 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log(`Validated ${htmlFiles.length} HTML files, project metadata, versions, Supabase Account Sync guards, token refresh policy, stable runtime paths, import recovery guards, and responsive/accessibility/security rules: OK`);
+console.log(`Validated ${htmlFiles.length} HTML files, project metadata, versions, Recent/Best Supabase Account Sync guards, auto accumulation, token refresh policy, stable runtime paths, import recovery guards, and responsive/accessibility/security rules: OK`);
