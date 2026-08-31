@@ -1,6 +1,6 @@
 {
   "name": "osu-setup-launcher",
-  "version": "0.18.4",
+  "version": "0.18.5",
   "description": "osu!lazer 用の一括セットアップ起動Electronアプリ",
   "main": "src/bootstrap.js",
   "scripts": {
