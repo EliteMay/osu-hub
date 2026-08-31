@@ -2,6 +2,41 @@
 
 Web Versionの正本は `data/site.json` の `siteVersion` です。Desktop Launcher Versionの正本は `package.json` の `version` です。
 
+## Web 0.2.9 - 2026-08-31
+
+### Changed
+
+- Desktop Toolsの配布表示をSetup Launcher `v0.18.0` へ更新
+- 音声切替のSVCL + Windows標準Fallback構成を表示
+
+### Verification
+
+- PRでWindows installer build / JavaScript syntax / installer生成を確認するWorkflowへ拡張
+- 実WindowsでのFxSound切替結果はv0.18.0 install後に確認する
+
+## Desktop 0.18.0 - 2026-08-31
+
+### Fixed
+
+- SVCL `/SetDefault` が成功してもCSVのDefault列だけでは既定出力を確認できず、偽エラーになるケースを修正
+- `DefaultRenderDevice` / `DefaultRenderDeviceMulti` / `DefaultRenderDeviceComm` を `/GetColumnValue` で直接照合してWindowsの既定出力を確認
+- 上記確認が利用できない環境では従来CSV確認へFallback
+- それでも確認できない場合はWindows PolicyConfigによる標準Fallbackを実行
+- PolicyConfig側も切替後に実際のMultimedia default device IDを再取得して一致確認
+
+### CI / Distribution
+
+- Desktop変更のPull RequestでもWindows installerをbuild
+- PRではReleaseを作らず、main merge後だけGitHub Releaseを作成
+- `node --check` でElectron main / preload / rendererの構文をbuild前に確認
+- Release Notesは `version.json#releaseNotes` を利用
+
+### Compatibility
+
+- Launcher userData保存方式は変更なし
+- `configVersion` は17のまま
+- 既存の音声デバイス設定・OpenTabletDriver・REAL・osu!パスを維持
+
 ## Web 0.2.8 - 2026-08-31
 
 ### Changed
