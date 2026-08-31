@@ -83,6 +83,11 @@ jobs:
           }
           Add-Type -Path (Resolve-Path 'tools/AudioSwitcher.cs') -ErrorAction Stop
 
+      - name: Run audio matcher self-test
+        shell: powershell
+        run: |
+          & .\tools\switch_audio_device.ps1 -SelfTest
+
       - name: Build installer
         run: npm run build:win
 

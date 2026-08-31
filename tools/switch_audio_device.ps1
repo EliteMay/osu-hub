@@ -1,6 +1,8 @@
 param(
   [string]$DeviceName = "",
-  [switch]$List
+  [string]$DeviceHint = "",
+  [switch]$List,
+  [switch]$SelfTest
 )
 
 $ErrorActionPreference = "Stop"
@@ -30,17 +32,112 @@ function Normalize-AudioText([string]$Value) {
   return (($Value.Trim().ToLowerInvariant()) -replace '[\s_\-\(\)\[\]\{\}\\/]+', ' ').Trim()
 }
 
+function Get-AudioTokens([string]$Value) {
+  $normalized = Normalize-AudioText $Value
+  if ([string]::IsNullOrWhiteSpace($normalized)) { return @() }
+
+  $stopWords = @('audio', 'device', 'render', 'default', 'endpoint', 'output', 'high', 'definition')
+  $tokens = @()
+  foreach ($token in ($normalized -split ' ')) {
+    $item = $token.Trim()
+    if ($item.Length -lt 2) { continue }
+    if ($stopWords -contains $item) { continue }
+    if ($tokens -notcontains $item) { $tokens += $item }
+  }
+  return $tokens
+}
+
+function Test-AllAudioTokensPresent([string[]]$Tokens, [string]$Candidate) {
+  if ($null -eq $Tokens -or $Tokens.Count -eq 0) { return $false }
+  $candidateNormalized = Normalize-AudioText $Candidate
+  if ([string]::IsNullOrWhiteSpace($candidateNormalized)) { return $false }
+  foreach ($token in $Tokens) {
+    if (-not $candidateNormalized.Contains($token)) { return $false }
+  }
+  return $true
+}
+
 function Test-AudioTextMatch([string]$Expected, [string]$Actual) {
   $expectedNormalized = Normalize-AudioText $Expected
   $actualNormalized = Normalize-AudioText $Actual
   if ([string]::IsNullOrWhiteSpace($expectedNormalized) -or [string]::IsNullOrWhiteSpace($actualNormalized)) {
     return $false
   }
-  return (
+  if (
     ($expectedNormalized -eq $actualNormalized) -or
     $expectedNormalized.Contains($actualNormalized) -or
     $actualNormalized.Contains($expectedNormalized)
+  ) {
+    return $true
+  }
+
+  return Test-AllAudioTokensPresent (Get-AudioTokens $Expected) $Actual
+}
+
+function Get-AudioDeviceMatchScore {
+  param(
+    [string]$Expected,
+    [string]$Hint,
+    [string]$Name,
+    [string]$Id
   )
+
+  $expectedNormalized = Normalize-AudioText $Expected
+  $hintNormalized = Normalize-AudioText $Hint
+  $nameNormalized = Normalize-AudioText $Name
+  $idNormalized = Normalize-AudioText $Id
+  $candidate = (($nameNormalized + ' ' + $idNormalized).Trim())
+
+  if (-not [string]::IsNullOrWhiteSpace($expectedNormalized)) {
+    if ($nameNormalized -eq $expectedNormalized -or $idNormalized -eq $expectedNormalized) { return 120 }
+    if ($nameNormalized.Contains($expectedNormalized) -or $idNormalized.Contains($expectedNormalized)) { return 110 }
+    $expectedTokens = Get-AudioTokens $Expected
+    if (Test-AllAudioTokensPresent $expectedTokens $candidate) { return (90 + [Math]::Min(9, $expectedTokens.Count)) }
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($hintNormalized)) {
+    if ($nameNormalized -eq $hintNormalized -or $idNormalized -eq $hintNormalized) { return 108 }
+    if ($candidate.Contains($hintNormalized)) { return 104 }
+    $hintTokens = Get-AudioTokens $Hint
+    if (Test-AllAudioTokensPresent $hintTokens $candidate) { return (84 + [Math]::Min(9, $hintTokens.Count)) }
+  }
+
+  return 0
+}
+
+function Find-BestRenderDeviceMatch {
+  param(
+    $Devices,
+    [string]$Expected,
+    [string]$Hint = ""
+  )
+
+  $ranked = @()
+  foreach ($device in $Devices) {
+    $score = Get-AudioDeviceMatchScore -Expected $Expected -Hint $Hint -Name $device.Name -Id $device.Id
+    if ($score -gt 0) {
+      $ranked += [PSCustomObject]@{ Score = $score; Device = $device }
+    }
+  }
+
+  $best = $ranked | Sort-Object -Property Score -Descending | Select-Object -First 1
+  if ($null -eq $best) { return $null }
+  return $best.Device
+}
+
+if ($SelfTest.IsPresent) {
+  $fixtures = @(
+    [PSCustomObject]@{ Name = 'Speakers (FxSound Audio Enhancer)'; Id = '{0.0.0.00000000}.{FXSOUND}'; IsDefault = $false },
+    [PSCustomObject]@{ Name = '2- Arctis GameBuds'; Id = '{0.0.0.00000000}.{ARCTIS}'; IsDefault = $true }
+  )
+  $fixtureHint = 'FxSound Audio Enhancer\Device\FxSound Speakers\Render'
+  $fixtureMatch = Find-BestRenderDeviceMatch -Devices $fixtures -Expected 'FxSound Speakers' -Hint $fixtureHint
+  if ($null -eq $fixtureMatch -or $fixtureMatch.Name -ne 'Speakers (FxSound Audio Enhancer)') {
+    Write-Error 'AUDIO_MATCH_SELF_TEST_FAILED: FxSound word-order fixture did not resolve to the FxSound endpoint.'
+    exit 20
+  }
+  Write-Output 'AUDIO_MATCH_SELF_TEST_OK: FxSound Speakers -> Speakers (FxSound Audio Enhancer)'
+  exit 0
 }
 
 function Get-SvclColumn([string]$Alias, [string]$Column) {
@@ -61,7 +158,12 @@ if (-not $List.IsPresent -and -not [string]::IsNullOrWhiteSpace($DeviceName) -an
   foreach ($alias in @("DefaultRenderDeviceMulti", "DefaultRenderDevice", "DefaultRenderDeviceComm")) {
     $name = Get-SvclColumn $alias "Name"
     $id = Get-SvclColumn $alias "Command-Line Friendly ID"
-    if ((Test-AudioTextMatch $DeviceName $name) -or (Test-AudioTextMatch $DeviceName $id)) {
+    if (
+      (Test-AudioTextMatch $DeviceName $name) -or
+      (Test-AudioTextMatch $DeviceName $id) -or
+      (-not [string]::IsNullOrWhiteSpace($DeviceHint) -and (Test-AudioTextMatch $DeviceHint $name)) -or
+      (-not [string]::IsNullOrWhiteSpace($DeviceHint) -and (Test-AudioTextMatch $DeviceHint $id))
+    ) {
       $verifiedLabel = if ($name) { $name } else { $id }
       Write-Output ("VERIFIED_DEFAULT_SVCL: " + $verifiedLabel)
       exit 0
@@ -112,16 +214,14 @@ if ([string]::IsNullOrWhiteSpace($DeviceName)) {
   exit 2
 }
 
-$matched = $null
-foreach ($device in $devices) {
-  if (($device.Name -like ("*" + $DeviceName + "*")) -or ($device.Id -like ("*" + $DeviceName + "*"))) {
-    $matched = $device
-    break
-  }
-}
+$matched = Find-BestRenderDeviceMatch -Devices $devices -Expected $DeviceName -Hint $DeviceHint
 
 if ($null -eq $matched) {
   Write-Error ("Device not found: " + $DeviceName)
+  if (-not [string]::IsNullOrWhiteSpace($DeviceHint)) {
+    Write-Output ("DEVICE_HINT: " + $DeviceHint)
+  }
+  Write-Output ("MATCH_TOKENS: " + ((Get-AudioTokens ($DeviceName + ' ' + $DeviceHint)) -join ', '))
   Write-Output "AVAILABLE_DEVICES:"
   foreach ($device in $devices) {
     $prefix = "DEVICE"
@@ -130,6 +230,8 @@ if ($null -eq $matched) {
   }
   exit 3
 }
+
+Write-Output ("MATCHED_CORE_AUDIO: " + $matched.Name)
 
 try {
   [OsuSetupAudio.AudioSwitcher]::SetDefaultRenderDevice($matched.Id)
