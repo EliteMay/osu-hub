@@ -17,12 +17,12 @@
 - Actual: `IMMDeviceEnumerator.EnumAudioEndpoints` の戻り値を `IMMDeviceCollection` へQueryInterfaceする時点で失敗し、デバイス一覧すら取得できなかった。
 - Trigger / Reproduction: v0.18.0でFxSound Speakersを対象に一括実行し、SVCL alias / CSV確認からFallbackへ入る。
 - Root Cause: `tools/AudioSwitcher.cs` の `IMMDeviceCollection` IIDを `0BD7A1BE-7A1A-44DB-8397-C0A53CAD458F` と誤記していた。Windows SDK上の正しいIIDは `0BD7A1BE-7A1A-44DB-8397-CC5392387B5E`。
-- Final Fix: IIDをWindows SDKと一致させた。さらに `tools/switch_audio_device.ps1` はCore Audioへ入る前に、bundled SVCLへ `/GetColumnValue DefaultRenderDevice*` を直接実行して既定出力を再確認する。
+- Final Fix: IIDをWindows SDKと一致させた。さらに `tools/switch_audio_device.ps1` はCore Audioへ入る前に、app toolsまたはElectron `userData/tools` にある利用可能なSVCLへ `/GetColumnValue DefaultRenderDevice*` を直接実行して既定出力を再確認する。
 - Affected files / systems: `tools/AudioSwitcher.cs`, `tools/switch_audio_device.ps1`, Windows audio fallback
 - Detection method: 実WindowsのLauncher実行ログに `E_NOINTERFACE (0x80004002)` と誤ったIIDが表示されたことで特定。
-- Regression Guard: `tests/validate-audio-interop.mjs` で正しいIIDを必須化し、誤ったIIDの再混入を失敗扱いにする。Windows installer CIでも同Validatorを実行する。
+- Regression Guard: `tests/validate-audio-interop.mjs` で正しいIIDを必須化し、誤ったIIDの再混入を失敗扱いにする。Windows installer CIでも同Validatorを実行し、Windows PowerShell 5.1でFallback scriptをparse、`AudioSwitcher.cs` を`Add-Type`でcompileする。
 - Prevention: COM GUID / IIDは記憶や類似コードから転記せず、Windows SDK / Microsoft公式定義と照合する。Windows固有Fallbackは静的build成功だけで完了扱いにせず、実機ログまで確認する。
-- Related Issue / PR / Commit: この修正PR
+- Related Issue / PR / Commit: PR #14
 - Guide candidate: yes
 - Guide note: OS COM interopを使うProjectでは、GUID/IIDを公式定義と照合するStatic Guardが再発防止に有効。
 
@@ -42,7 +42,7 @@
 - Detection method: Launcherの段階ログと実Windows結果を比較。
 - Regression Guard: `tests/validate-audio-interop.mjs` とWindows installer CI。
 - Prevention: 外部CLIのexit codeだけでOS状態変更を成功扱いしない。状態変更後に独立したread-back確認を持つ。
-- Related Issue / PR / Commit: v0.17.0〜v0.18.1の音声切替修正
+- Related Issue / PR / Commit: v0.17.0〜v0.18.1の音声切替修正 / PR #14
 - Guide candidate: yes
 - Guide note: Windows固有操作は「command accepted」と「state verified」を分離する一般ルールにできる。
 
