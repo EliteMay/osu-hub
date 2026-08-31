@@ -1,5 +1,5 @@
 {
-  "latestVersion": "0.17.0",
+  "latestVersion": "0.18.0",
   "downloadUrl": "https://github.com/EliteMay/osu-hub/releases/latest",
-  "releaseNotes": "osu! Hubへ統合。Setup Launcher v0.17.0はDesktop Toolsとして継続し、更新確認先をosu-hubへ変更。"
+  "releaseNotes": "音声切替の確認方法を改善。SVCLのDefaultRenderDevice系エイリアスでWindows既定出力を直接確認し、確認できない場合はWindows標準PolicyConfigへFallbackします。"
 }
