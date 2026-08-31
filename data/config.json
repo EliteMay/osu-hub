@@ -11,7 +11,7 @@
     "scriptPath": "tools\\switch_audio_device.ps1",
     "customCommand": "",
     "command": "",
-    "memo": "v0.18.8では完全Endpoint IDが実機のSVCL IDと一致しない場合でも、同じAudio Providerの唯一のActive Render Endpointへ安全にFallbackする。Application音声セッションは除外し、同点候補では切替しない。",
+    "memo": "v0.18.9ではSVCLで検出した実際の再生デバイスを一覧から選び、内部では正確なEndpoint IDを保存する。詳細IDの手入力は通常不要。Application音声セッション除外と曖昧候補での安全停止は維持する。",
     "helperPath": "tools\\AudioSwitcher.cs",
     "soundVolumeViewPath": "",
     "nircmdPath": "tools\\nircmdc.exe",
@@ -54,9 +54,9 @@
     "初回はOpenTabletDriverと遅延対策アプリのパスを設定する",
     "osu!lazerは未設定でも一般的な保存先から自動検出する",
     "音声切替はSVCLモード推奨。まず「SVCLを自動取得」を押す",
+    "切り替え先は検出した再生デバイス一覧から選ぶ。通常はEndpoint IDを手入力しない",
     "音声デバイス一覧には実デバイスEndpointだけを表示し、Firefox等のApplicationセッションは候補にしない",
     "日本語WindowsでEndpoint IDの区切りが¥/￥表示でも同じWindowsパスとして扱う",
-    "完全Endpoint IDが古い・推測値でもProviderが一致し、Active候補が1件だけならそのEndpointを使用する",
     "同じProviderのActive候補が複数ある場合は勝手に切り替えず停止する"
   ],
   "updateCheck": {
@@ -65,5 +65,5 @@
     "memo": "v0.18.2以降はGitHub Releasesのelectron-updater用Metadataで起動時に自動確認します。versionUrlは旧版互換用として残します。",
     "lastDownloadUrl": ""
   },
-  "appVersion": "0.18.8"
+  "appVersion": "0.18.9"
 }
