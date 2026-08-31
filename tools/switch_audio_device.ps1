@@ -122,7 +122,9 @@ function Find-BestRenderDeviceMatch {
   foreach ($device in $Devices) {
     $score = Get-AudioDeviceMatchScore -Expected $Expected -Hint $Hint -Name $device.Name -Id $device.Id
     if ($score -gt 0) {
-      $ranked += [PSCustomObject]@{ Score = $score; Device = $device }
+      $activeBonus = 0
+      try { if ($device.IsActive) { $activeBonus = 25 } } catch {}
+      $ranked += [PSCustomObject]@{ Score = ($score + $activeBonus); Device = $device }
     }
   }
 
@@ -131,21 +133,64 @@ function Find-BestRenderDeviceMatch {
   return $best.Device
 }
 
+function Test-FxSoundTarget([string]$Value) {
+  return (Normalize-AudioText $Value).Contains('fxsound')
+}
+
+function Find-FxSoundExecutable {
+  $programFilesX86 = [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
+  $candidates = @(
+    (Join-Path $env:ProgramFiles 'FxSound LLC\FxSound\FxSound.exe'),
+    $(if (-not [string]::IsNullOrWhiteSpace($programFilesX86)) { Join-Path $programFilesX86 'FxSound LLC\FxSound\FxSound.exe' } else { '' }),
+    (Join-Path $env:LOCALAPPDATA 'Programs\FxSound\FxSound.exe'),
+    (Join-Path $env:LOCALAPPDATA 'FxSound\FxSound.exe')
+  )
+  foreach ($candidate in $candidates) {
+    if (-not [string]::IsNullOrWhiteSpace($candidate) -and (Test-Path $candidate)) { return $candidate }
+  }
+  return ""
+}
+
+function Ensure-FxSoundProcess {
+  try {
+    $running = Get-Process -Name 'FxSound' -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($null -ne $running) {
+      Write-Output ("FXSOUND_PROCESS: already running pid=" + $running.Id)
+      return $true
+    }
+  } catch {}
+
+  $exe = Find-FxSoundExecutable
+  if ([string]::IsNullOrWhiteSpace($exe)) {
+    Write-Output "FXSOUND_PROCESS: executable not found in known install paths"
+    return $false
+  }
+
+  try {
+    Start-Process -FilePath $exe -WorkingDirectory (Split-Path -Parent $exe) -WindowStyle Minimized | Out-Null
+    Write-Output ("FXSOUND_PROCESS: started " + $exe)
+    return $true
+  } catch {
+    Write-Output ("FXSOUND_PROCESS: start failed: " + $_.Exception.Message)
+    return $false
+  }
+}
+
 if ($SelfTest.IsPresent) {
   $fixtures = @(
-    [PSCustomObject]@{ Name = 'Localized Output (FxSound Audio Enhancer)'; Id = '{0.0.0.00000000}.{FXSOUND-LOCALIZED}'; IsDefault = $false },
-    [PSCustomObject]@{ Name = 'Speakers (Other Audio Enhancer)'; Id = '{0.0.0.00000000}.{OTHER-EN}'; IsDefault = $false },
-    [PSCustomObject]@{ Name = '2- Arctis GameBuds'; Id = '{0.0.0.00000000}.{ARCTIS}'; IsDefault = $true }
+    [PSCustomObject]@{ Name = 'Localized Output (FxSound Audio Enhancer)'; Id = '{0.0.0.00000000}.{FXSOUND-LOCALIZED}'; State = 'Unplugged'; IsActive = $false; IsDefault = $false },
+    [PSCustomObject]@{ Name = 'Speakers (FxSound Audio Enhancer)'; Id = '{0.0.0.00000000}.{FXSOUND-EN}'; State = 'Active'; IsActive = $true; IsDefault = $false },
+    [PSCustomObject]@{ Name = '2- Arctis GameBuds'; Id = '{0.0.0.00000000}.{ARCTIS}'; State = 'Active'; IsActive = $true; IsDefault = $true }
   )
   $fixtureHint = 'FxSound Audio Enhancer\Device\FxSound Speakers\Render'
 
-  $fixtureMatchLocalized = Find-BestRenderDeviceMatch -Devices $fixtures -Expected 'FxSound Speakers' -Hint ''
-  if ($null -eq $fixtureMatchLocalized -or $fixtureMatchLocalized.Name -ne 'Localized Output (FxSound Audio Enhancer)') {
-    Write-Error 'AUDIO_MATCH_SELF_TEST_FAILED: localized FxSound fixture did not resolve from FxSound Speakers.'
+  $fixtureMatchActive = Find-BestRenderDeviceMatch -Devices $fixtures -Expected 'FxSound Speakers' -Hint ''
+  if ($null -eq $fixtureMatchActive -or $fixtureMatchActive.Name -ne 'Speakers (FxSound Audio Enhancer)') {
+    Write-Error 'AUDIO_MATCH_SELF_TEST_FAILED: active FxSound endpoint was not preferred.'
     exit 20
   }
 
-  $fixtureMatchHint = Find-BestRenderDeviceMatch -Devices $fixtures -Expected 'unknown output' -Hint $fixtureHint
+  $fixtureMatchHint = Find-BestRenderDeviceMatch -Devices @($fixtures[0], $fixtures[2]) -Expected 'unknown output' -Hint $fixtureHint
   if ($null -eq $fixtureMatchHint -or -not $fixtureMatchHint.Name.Contains('FxSound Audio Enhancer')) {
     Write-Error 'AUDIO_MATCH_SELF_TEST_FAILED: SVCL command-line hint did not resolve to an FxSound endpoint.'
     exit 21
@@ -157,7 +202,7 @@ if ($SelfTest.IsPresent) {
     exit 22
   }
 
-  Write-Output 'AUDIO_MATCH_SELF_TEST_OK: FxSound Speakers -> localized FxSound Audio Enhancer endpoint'
+  Write-Output 'AUDIO_MATCH_SELF_TEST_OK: active endpoint preference and FxSound matching are valid'
   exit 0
 }
 
@@ -174,22 +219,42 @@ function Get-SvclColumn([string]$Alias, [string]$Column) {
   }
 }
 
-if (-not $List.IsPresent -and -not [string]::IsNullOrWhiteSpace($DeviceName) -and -not [string]::IsNullOrWhiteSpace($svclPath)) {
-  Start-Sleep -Milliseconds 350
-  foreach ($alias in @("DefaultRenderDeviceMulti", "DefaultRenderDevice", "DefaultRenderDeviceComm")) {
-    $name = Get-SvclColumn $alias "Name"
-    $id = Get-SvclColumn $alias "Command-Line Friendly ID"
+function Test-SvclTargetActive([string]$Target) {
+  $state = Get-SvclColumn $Target 'Device State'
+  if (-not [string]::IsNullOrWhiteSpace($state)) {
+    Write-Output ("SVCL_TARGET_STATE: " + $state)
+  }
+  return ($state -match 'active')
+}
+
+function Verify-SvclDefault([string]$Expected, [string]$Hint) {
+  if ([string]::IsNullOrWhiteSpace($svclPath) -or -not (Test-Path $svclPath)) { return $false }
+  foreach ($alias in @('DefaultRenderDeviceMulti', 'DefaultRenderDevice', 'DefaultRenderDeviceComm')) {
+    $name = Get-SvclColumn $alias 'Name'
+    $id = Get-SvclColumn $alias 'Command-Line Friendly ID'
     if (
-      (Test-AudioTextMatch $DeviceName $name) -or
-      (Test-AudioTextMatch $DeviceName $id) -or
-      (-not [string]::IsNullOrWhiteSpace($DeviceHint) -and (Test-AudioTextMatch $DeviceHint $name)) -or
-      (-not [string]::IsNullOrWhiteSpace($DeviceHint) -and (Test-AudioTextMatch $DeviceHint $id))
+      (Test-AudioTextMatch $Expected $name) -or
+      (Test-AudioTextMatch $Expected $id) -or
+      (-not [string]::IsNullOrWhiteSpace($Hint) -and (Test-AudioTextMatch $Hint $name)) -or
+      (-not [string]::IsNullOrWhiteSpace($Hint) -and (Test-AudioTextMatch $Hint $id))
     ) {
       $verifiedLabel = if ($name) { $name } else { $id }
       Write-Output ("VERIFIED_DEFAULT_SVCL: " + $verifiedLabel)
-      exit 0
+      return $true
     }
   }
+  return $false
+}
+
+$fxSoundTarget = (Test-FxSoundTarget ($DeviceName + ' ' + $DeviceHint))
+if (-not $List.IsPresent -and $fxSoundTarget) {
+  $null = Ensure-FxSoundProcess
+  Start-Sleep -Milliseconds 900
+}
+
+if (-not $List.IsPresent -and -not [string]::IsNullOrWhiteSpace($DeviceName)) {
+  $null = Test-SvclTargetActive $DeviceName
+  if (Verify-SvclDefault -Expected $DeviceName -Hint $DeviceHint) { exit 0 }
 }
 
 if (-not (Test-Path $csPath)) {
@@ -204,28 +269,52 @@ try {
   exit 11
 }
 
-try {
-  $devices = [OsuSetupAudio.AudioSwitcher]::GetRenderDevices()
-} catch {
-  Write-Error ("Device list failed: " + $_.Exception.Message)
-  exit 12
+function Get-CoreAudioSnapshot {
+  try {
+    return @([OsuSetupAudio.AudioSwitcher]::GetRenderDevicesAll())
+  } catch {
+    Write-Error ("Device list failed: " + $_.Exception.Message)
+    exit 12
+  }
 }
 
-if ($null -eq $devices) {
-  Write-Error "Device list failed: returned null."
-  exit 14
+function Format-CoreAudioDevices($Devices) {
+  $items = @()
+  foreach ($device in $Devices) {
+    $items += ($device.Name + ' [' + $device.State.ToString() + ']')
+  }
+  return ($items -join ' | ')
 }
+
+function Resolve-CoreAudioTarget {
+  param([string]$Expected, [string]$Hint = "")
+  $devices = Get-CoreAudioSnapshot
+  $match = Find-BestRenderDeviceMatch -Devices $devices -Expected $Expected -Hint $Hint
+  return [PSCustomObject]@{ Devices = $devices; Match = $match }
+}
+
+function Wait-CoreAudioTargetActive {
+  param([string]$Expected, [string]$Hint = "", [int]$Attempts = 12)
+  for ($i = 0; $i -lt $Attempts; $i++) {
+    $resolved = Resolve-CoreAudioTarget -Expected $Expected -Hint $Hint
+    if ($null -ne $resolved.Match -and $resolved.Match.IsActive) { return $resolved }
+    Start-Sleep -Milliseconds 450
+  }
+  return (Resolve-CoreAudioTarget -Expected $Expected -Hint $Hint)
+}
+
+$devices = Get-CoreAudioSnapshot
 
 if ($List.IsPresent) {
   if ($devices.Count -eq 0) {
-    Write-Output "NO_ACTIVE_RENDER_DEVICES_FOUND"
+    Write-Output "NO_RENDER_DEVICES_FOUND"
     exit 0
   }
 
   foreach ($device in $devices) {
     $prefix = "DEVICE"
     if ($device.IsDefault) { $prefix = "DEFAULT" }
-    Write-Output ($prefix + ": " + $device.Name)
+    Write-Output ($prefix + ": " + $device.Name + " [" + $device.State.ToString() + "]")
   }
   exit 0
 }
@@ -235,27 +324,60 @@ if ([string]::IsNullOrWhiteSpace($DeviceName)) {
   exit 2
 }
 
-$matched = Find-BestRenderDeviceMatch -Devices $devices -Expected $DeviceName -Hint $DeviceHint
+$resolvedTarget = Resolve-CoreAudioTarget -Expected $DeviceName -Hint $DeviceHint
+$matched = $resolvedTarget.Match
+
+if ($null -eq $matched -and $fxSoundTarget) {
+  $null = Ensure-FxSoundProcess
+  $resolvedTarget = Wait-CoreAudioTargetActive -Expected $DeviceName -Hint $DeviceHint -Attempts 12
+  $matched = $resolvedTarget.Match
+}
+
+if ($null -ne $matched -and -not $matched.IsActive) {
+  Write-Output ("MATCHED_CORE_AUDIO_INACTIVE: " + $matched.Name + " [" + $matched.State.ToString() + "]")
+
+  if (-not [string]::IsNullOrWhiteSpace($svclPath) -and (Test-Path $svclPath) -and ($matched.State.ToString() -match 'Disabled')) {
+    try {
+      & $svclPath /Enable $matched.Id 2>&1 | Out-Null
+      Write-Output ("SVCL_ENABLE_ATTEMPT: " + $matched.Id)
+    } catch {
+      Write-Output ("SVCL_ENABLE_ATTEMPT_FAILED: " + $_.Exception.Message)
+    }
+  }
+
+  if ($fxSoundTarget) { $null = Ensure-FxSoundProcess }
+  $resolvedTarget = Wait-CoreAudioTargetActive -Expected $DeviceName -Hint $DeviceHint -Attempts 14
+  $matched = $resolvedTarget.Match
+}
 
 if ($null -eq $matched) {
   $queryTokens = ((Get-AudioTokens ($DeviceName + ' ' + $DeviceHint)) -join ', ')
-  $available = (($devices | ForEach-Object { $_.Name }) -join ' | ')
-  Write-Error ("Device not found: " + $DeviceName + "; MATCH_TOKENS=" + $queryTokens + "; AVAILABLE_DEVICES=" + $available)
-  if (-not [string]::IsNullOrWhiteSpace($DeviceHint)) {
-    Write-Output ("DEVICE_HINT: " + $DeviceHint)
-  }
-  Write-Output ("MATCH_TOKENS: " + $queryTokens)
-  Write-Output "AVAILABLE_DEVICES:"
-  foreach ($device in $devices) {
-    $prefix = "DEVICE"
-    if ($device.IsDefault) { $prefix = "DEFAULT" }
-    Write-Output ($prefix + ": " + $device.Name)
-  }
+  $available = Format-CoreAudioDevices $resolvedTarget.Devices
+  Write-Error ("Device not found in Core Audio: " + $DeviceName + "; MATCH_TOKENS=" + $queryTokens + "; AVAILABLE_DEVICES=" + $available)
   exit 3
 }
 
-Write-Output ("MATCHED_CORE_AUDIO: " + $matched.Name)
+if (-not $matched.IsActive) {
+  $available = Format-CoreAudioDevices $resolvedTarget.Devices
+  Write-Error ("Target endpoint is not active: " + $matched.Name + "; STATE=" + $matched.State.ToString() + "; AVAILABLE_DEVICES=" + $available)
+  exit 17
+}
+
+Write-Output ("MATCHED_CORE_AUDIO: " + $matched.Name + " [" + $matched.State.ToString() + "]")
 Write-Output ("MATCH_TOKENS: " + ((Get-AudioTokens ($DeviceName + ' ' + $DeviceHint)) -join ', '))
+
+if (-not [string]::IsNullOrWhiteSpace($svclPath) -and (Test-Path $svclPath)) {
+  try {
+    & $svclPath /SetDefault $matched.Id all 2>&1 | Out-Null
+    Start-Sleep -Milliseconds 300
+    if (Verify-SvclDefault -Expected $DeviceName -Hint $DeviceHint) {
+      Write-Output ("SWITCHED_TO: " + $matched.Name)
+      exit 0
+    }
+  } catch {
+    Write-Output ("SVCL_RETRY_FAILED: " + $_.Exception.Message)
+  }
+}
 
 try {
   [OsuSetupAudio.AudioSwitcher]::SetDefaultRenderDevice($matched.Id)
@@ -264,10 +386,10 @@ try {
   exit 13
 }
 
-Start-Sleep -Milliseconds 250
+Start-Sleep -Milliseconds 300
 
 try {
-  $afterDevices = [OsuSetupAudio.AudioSwitcher]::GetRenderDevices()
+  $afterDevices = @([OsuSetupAudio.AudioSwitcher]::GetRenderDevices())
   $verified = $afterDevices | Where-Object {
     $_.IsDefault -and [String]::Equals($_.Id, $matched.Id, [StringComparison]::OrdinalIgnoreCase)
   } | Select-Object -First 1
