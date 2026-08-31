@@ -116,12 +116,12 @@ function rankCandidates(items, target) {
     .sort((a, b) => b.score - a.score || Number(isActiveState(b.item.state)) - Number(isActiveState(a.item.state)) || candidateKey(a.item).localeCompare(candidateKey(b.item)));
 }
 
-function resolveRanked(ranked, reason = "ambiguous") {
+function resolveRanked(ranked) {
   if (!ranked.length) return { ok: false, reason: "not-found", ranked: [] };
   const best = ranked[0];
   const second = ranked[1];
   if (second && best.score === second.score && candidateKey(best.item) !== candidateKey(second.item)) {
-    return { ok: false, reason, ranked: ranked.slice(0, 8) };
+    return { ok: false, reason: "ambiguous", ranked: ranked.slice(0, 8) };
   }
   return { ok: true, item: best.item, score: best.score, ranked: ranked.slice(0, 8) };
 }
@@ -137,7 +137,7 @@ function chooseSvclDevice(items, target) {
   const provider = endpointProvider(target);
   if (!provider) return direct;
 
-  const fallback = resolveRanked(rankCandidates(items, provider), "ambiguous-provider");
+  const fallback = resolveRanked(rankCandidates(items, provider));
   if (!fallback.ok) return { ...fallback, providerFallback: provider };
   return { ...fallback, matchedBy: "provider-fallback", providerFallback: provider };
 }
