@@ -17,6 +17,35 @@ const fallbackScript = read('tools/switch_audio_device.ps1');
 const windowsWorkflow = read('.github/workflows/build-windows.yml');
 const desktopMain = read('src/main.js');
 const audioMatcher = read('src/audio-matcher.js');
+const audioPicker = read('src/renderer/audio-picker.js');
+const rendererHtml = read('src/renderer/index.html');
+
+try {
+  new Function(audioPicker);
+} catch (error) {
+  fail(`src/renderer/audio-picker.js syntax error: ${error.message}`);
+}
+
+for (const marker of [
+  'id="audioDeviceSelect"',
+  'id="audioRefreshButton"',
+  'id="audioDevicePickerStatus"',
+  '詳細なデバイスIDを確認・手入力',
+  'src="./audio-picker.js"'
+]) {
+  if (!rendererHtml.includes(marker)) fail(`Renderer audio picker is missing marker: ${marker}`);
+}
+
+for (const marker of [
+  'window.osuLauncher.listAudioDevices',
+  'parseDeviceLogs',
+  'providerFromId',
+  '現在の既定',
+  'manual.dispatchEvent',
+  'saveButton?.click()'
+]) {
+  if (!audioPicker.includes(marker)) fail(`audio-picker.js is missing behavior marker: ${marker}`);
+}
 
 const correctCollectionIid = '0BD7A1BE-7A1A-44DB-8397-CC5392387B5E';
 const brokenCollectionIid = '0BD7A1BE-7A1A-44DB-8397-C0A53CAD458F';
@@ -113,7 +142,7 @@ const observedFixtures = [
   },
   {
     name: 'スピーカー',
-    id: 'High Definition Audio Device\\Device\\Speakers\\Render',
+    id: 'High Definition Audio Device\\Device\\スピーカー\\Render',
     itemId: '{speaker-endpoint}',
     direction: 'Render',
     type: 'Device',
@@ -121,7 +150,7 @@ const observedFixtures = [
   },
   {
     name: 'ヘッドホン',
-    id: 'High Definition Audio Device\\Device\\Headphones\\Render',
+    id: 'High Definition Audio Device\\Device\\ヘッドホン\\Render',
     itemId: '{headphone-endpoint}',
     direction: 'Render',
     type: 'Device',
@@ -150,30 +179,35 @@ if (isSvclEndpointDevice(observedFixtures[0])) {
 }
 
 const genericHighDefinition = chooseSvclDevice(observedFixtures, 'High Definition Audio Device');
-if (!genericHighDefinition.ok || genericHighDefinition.item?.id !== 'High Definition Audio Device\\Device\\Speakers\\Render') {
+if (!genericHighDefinition.ok || genericHighDefinition.item?.id !== 'High Definition Audio Device\\Device\\スピーカー\\Render') {
   fail('The observed High Definition Audio Device query must select the active Speakers endpoint, not Firefox or an inactive endpoint.');
 }
 
-const exactHighDefinition = chooseSvclDevice(observedFixtures, 'High Definition Audio Device\\Device\\Speakers\\Render');
-if (!exactHighDefinition.ok || exactHighDefinition.item?.name !== 'スピーカー') {
-  fail('The full High Definition Audio Device endpoint ID must select the Speakers endpoint exactly.');
+const exactJapaneseHighDefinition = chooseSvclDevice(observedFixtures, 'High Definition Audio Device\\Device\\スピーカー\\Render');
+if (!exactJapaneseHighDefinition.ok || exactJapaneseHighDefinition.item?.name !== 'スピーカー') {
+  fail('The actual Japanese Windows endpoint ID must select the Speakers endpoint exactly.');
 }
 
-const japaneseYenHighDefinition = chooseSvclDevice(observedFixtures, 'High Definition Audio Device¥Device¥Speakers¥Render');
+const japaneseYenHighDefinition = chooseSvclDevice(observedFixtures, 'High Definition Audio Device¥Device¥スピーカー¥Render');
 if (!japaneseYenHighDefinition.ok || japaneseYenHighDefinition.item?.name !== 'スピーカー') {
   fail('Japanese yen-sign path separators must normalize to the same endpoint ID as backslashes.');
 }
-if (canonicalDeviceId('High Definition Audio Device￥Device￥Speakers￥Render') !== canonicalDeviceId('High Definition Audio Device\\Device\\Speakers\\Render')) {
+if (canonicalDeviceId('High Definition Audio Device￥Device￥スピーカー￥Render') !== canonicalDeviceId('High Definition Audio Device\\Device\\スピーカー\\Render')) {
   fail('Full-width yen separators must normalize to Windows backslashes.');
 }
-if (endpointProvider('High Definition Audio Device￥Device￥Speakers￥Render') !== 'high definition audio device') {
+if (endpointProvider('High Definition Audio Device￥Device￥スピーカー￥Render') !== 'high definition audio device') {
   fail('Endpoint provider extraction must work after Japanese separator normalization.');
+}
+
+const guessedEnglishEndpoint = chooseSvclDevice(observedFixtures, 'High Definition Audio Device\\Device\\Speakers\\Render');
+if (!guessedEnglishEndpoint.ok || guessedEnglishEndpoint.item?.name !== 'スピーカー' || guessedEnglishEndpoint.matchedBy !== 'provider-fallback') {
+  fail('An English guessed endpoint ID must safely fall back to the Japanese Windows endpoint for the same provider.');
 }
 
 const staleEndpointFixtures = [
   {
     name: 'スピーカー',
-    id: 'High Definition Audio Device\\Device\\Speakers Realtek\\Render',
+    id: 'High Definition Audio Device\\Device\\スピーカー Realtek\\Render',
     itemId: '{speaker-current-endpoint}',
     direction: 'Render',
     type: 'Device',
@@ -181,7 +215,7 @@ const staleEndpointFixtures = [
   },
   {
     name: 'ヘッドホン',
-    id: 'High Definition Audio Device\\Device\\Headphones\\Render',
+    id: 'High Definition Audio Device\\Device\\ヘッドホン\\Render',
     itemId: '{headphone-stale-endpoint}',
     direction: 'Render',
     type: 'Device',
@@ -196,7 +230,7 @@ if (!staleEndpointSelection.ok || staleEndpointSelection.item?.name !== 'スピ�
 
 const blankTypeRenderEndpoint = {
   name: 'スピーカー',
-  id: 'High Definition Audio Device\\Device\\Speakers\\Render',
+  id: 'High Definition Audio Device\\Device\\スピーカー\\Render',
   itemId: '{speaker-endpoint-blank-type}',
   direction: 'Render',
   type: '',
