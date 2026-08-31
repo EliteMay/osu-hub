@@ -1,5 +1,5 @@
 {
-  "latestVersion": "0.18.7",
+  "latestVersion": "0.18.8",
   "downloadUrl": "https://github.com/EliteMay/osu-hub/releases/latest",
-  "releaseNotes": "v0.18.6実機で完全なHigh Definition Audio DeviceのEndpoint IDを入力しても一致しないケースを確認。日本語Windowsではバックスラッシュが¥/￥として入力・コピーされる場合があるため、v0.18.7では¥/￥をWindowsの\\へ正規化して同じEndpoint IDとして扱う。Applicationセッション除外は維持し、SVCLのTypeが空でもRender Endpointを候補として扱えるよう互換性も改善。"
+  "releaseNotes": "v0.18.7実機で、推測した完全Endpoint IDが実際のSVCL IDと一致せず切替が止まるケースを確認。v0.18.8では完全IDが見つからない場合でも、ID内のAudio Provider部分へ安全にFallbackし、Applicationセッション除外後の唯一のActive Render Endpointを選択する。候補が同点なら従来どおり切替せず停止する。"
 }

@@ -100,22 +100,46 @@ function candidateKey(item) {
   return canonicalDeviceId(item?.id || item?.itemId || item?.name);
 }
 
-function chooseSvclDevice(items, target) {
-  const ranked = (Array.isArray(items) ? items : [])
+function endpointProvider(value) {
+  const target = canonicalDeviceId(value);
+  const marker = "\\device\\";
+  const markerIndex = target.indexOf(marker);
+  if (markerIndex <= 0 || !/\\render$/i.test(target)) return "";
+  return target.slice(0, markerIndex).trim();
+}
+
+function rankCandidates(items, target) {
+  return (Array.isArray(items) ? items : [])
     .filter(isSvclEndpointDevice)
     .map((item) => ({ item, score: scoreItem(item, target) }))
     .filter((entry) => entry.score > 0)
     .sort((a, b) => b.score - a.score || Number(isActiveState(b.item.state)) - Number(isActiveState(a.item.state)) || candidateKey(a.item).localeCompare(candidateKey(b.item)));
+}
 
+function resolveRanked(ranked, reason = "ambiguous") {
   if (!ranked.length) return { ok: false, reason: "not-found", ranked: [] };
-
   const best = ranked[0];
   const second = ranked[1];
   if (second && best.score === second.score && candidateKey(best.item) !== candidateKey(second.item)) {
-    return { ok: false, reason: "ambiguous", ranked: ranked.slice(0, 8) };
+    return { ok: false, reason, ranked: ranked.slice(0, 8) };
   }
-
   return { ok: true, item: best.item, score: best.score, ranked: ranked.slice(0, 8) };
+}
+
+function chooseSvclDevice(items, target) {
+  const direct = resolveRanked(rankCandidates(items, target));
+  if (direct.ok || direct.reason === "ambiguous") return direct;
+
+  // A copied or guessed endpoint ID may be stale even when the provider remains
+  // correct. Fall back only to the provider portion after Application sessions
+  // have already been excluded. Active state breaks ties; equal active matches
+  // still stop as ambiguous instead of switching arbitrarily.
+  const provider = endpointProvider(target);
+  if (!provider) return direct;
+
+  const fallback = resolveRanked(rankCandidates(items, provider), "ambiguous-provider");
+  if (!fallback.ok) return { ...fallback, providerFallback: provider };
+  return { ...fallback, matchedBy: "provider-fallback", providerFallback: provider };
 }
 
 module.exports = {
@@ -123,5 +147,6 @@ module.exports = {
   matchText,
   isSvclEndpointDevice,
   scoreItem,
+  endpointProvider,
   chooseSvclDevice
 };

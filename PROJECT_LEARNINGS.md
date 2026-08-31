@@ -90,11 +90,11 @@
 - Expected: SVCLで見つかったFxSound EndpointをCore Audioでも状態付きで確認し、必要ならActive化してから切り替える。
 - Actual: LauncherのSVCL一覧は `/ShowDisabledDevices 1 /ShowUnpluggedDevices 1` を指定していたためActive以外も含む一方、`AudioSwitcher.cs` は `EnumAudioEndpoints(... DeviceState.Active)` のみだった。Provider間で見ている集合が違い、名前Matcherを改善しても解決しない状態だった。
 - Trigger / Reproduction: FxSound EndpointがActive以外のStateにあるPCで、SVCL一覧から対象を選びCore Audio Fallbackへ入る。
-- Root Cause: Provider間で同じ「再生デバイス一覧」を扱っているつもりでも、State filter / visibility条件を揃えていなかった。またFxSoundのようなVirtual EndpointはCompanion Appの起動状態によってEndpointが利用可能になるため、既定出力切替だけ先に実行しても成立しない場合がある。
+- Root Cause: Provider間で同じ「再生デバイス一覧」を扱っているつもりでも、State filter / visibility・権限・lifecycle条件を揃えていなかった。またFxSoundのようなVirtual EndpointはCompanion Appの起動状態によってEndpointが利用可能になるため、既定出力切替だけ先に実行しても成立しない場合がある。
 - Final Fix: v0.18.5でCore AudioのAll stateを列挙し `State` / `IsActive` を保持する。FxSound targetでは `FxSound.exe` 起動、DisabledならSVCL `/Enable`、Active化Pollingの後に既定出力を再設定する。Active化できなければState付きで明示的に失敗する。
 - Affected files / systems: `tools/AudioSwitcher.cs`, `tools/switch_audio_device.ps1`, `tests/validate-audio-interop.mjs`
 - Detection method: v0.18.4実Windowsログの `AVAILABLE_DEVICES` にFxSoundが存在しないことと、SVCL一覧取得コードのShowDisabled/ShowUnplugged設定を照合。
-- Regression Guard: C# All-state API / State propertyのStatic Guard、PowerShell Self TestでActive候補優先、Windows CIでPowerShell 5.1 parse / C# compile。
+- Regression Guard: C# All-state API / State propertyのStatic Guard、PowerShell Self TestでActive FxSound候補をInactive候補より優先することを確認、Windows CIでPowerShell 5.1 parse / C# compile。
 - Prevention: 複数ProviderのEntity一覧を比較するときは、ID/NameだけでなくState filter・visibility・権限・lifecycle条件も揃える。Virtual Deviceを操作する場合はCompanion Process/Driver readinessを前提条件として扱う。
 - Related Issue / PR / Commit: PR #18 / v0.18.5
 - Guide candidate: yes
@@ -119,6 +119,26 @@
 - Related Issue / PR / Commit: v0.18.6
 - Guide candidate: yes
 - Guide note: Windows固有Toolだけでなく、外部Providerの検索結果からState変更対象を選ぶ処理全般へ一般化できる。
+
+### PL-F-007 推測した完全Endpoint IDを実機のStable IDとして扱わない
+
+- Date: 2026-08-31
+- Status: monitoring
+- Severity: high
+- Cost: high
+- Symptom: v0.18.7実機で `High Definition Audio Device\Device\Speakers\Render` を切替先として入力したが、SVCL実一覧にその完全文字列が存在せず `入力名に一致する再生デバイスが見つからない` で停止した。
+- Expected: 既知のAudio Providerを指定した場合、実際のRender Endpointを安全に特定できるか、曖昧なら変更せず停止する。
+- Actual: 実機から取得したIDではなく、表示名・過去ログから組み立てた推測IDを「完全ID」として扱っていた。v0.18.7は完全Endpoint形の入力に対して部分一致Fallbackを禁止していたため、安全には停止したが利用者は切替できなかった。
+- Trigger / Reproduction: `High Definition Audio Device\Device\Speakers\Render` のような推測Endpoint IDを入力し、実SVCL IDの末尾が異なる環境で音声切替を行う。
+- Root Cause: Human-visible labelからStable IDを推測して再構成したこと。ID namespaceのProvider部分は合っていてもEndpoint suffixが同じとは限らない。
+- Final Fix: v0.18.8で完全Endpoint IDが直接一致しない場合だけProvider部分を抽出し、Application Session除外後のRender Endpointを再評価する。唯一のActive候補なら採用し、同じScoreのActive候補が複数なら `ambiguous-provider` で安全停止する。
+- Affected files / systems: `src/audio-matcher.js`, `tests/validate-audio-interop.mjs`
+- Detection method: v0.18.7実Windowsのnot-foundログと、入力値が実SVCL一覧からコピーしたEvidenceではなく推測値だったことの確認。
+- Regression Guard: stale Endpoint fixtureでProvider fallbackが唯一のActive Speakersを選ぶこと、同ProviderのActive候補が複数なら停止することをNode testへ追加。
+- Prevention: OS/CLIのOpaque / Stable IDを表示名から推測しない。推測値を受け付ける必要がある場合は、安定したnamespace部分へ限定Fallbackし、候補数・State・Entity Classを使って安全性を担保する。
+- Related Issue / PR / Commit: PR #30 / v0.18.8
+- Guide candidate: yes
+- Guide note: 外部SystemのOpaque IDを人間が再構成せず、実列挙値または安全なnamespace fallbackを使う一般則としてReliability章へ候補。
 
 ---
 
@@ -159,4 +179,5 @@
 | PL-F-004 | failure | ローカライズ可能なデバイス種別語をEntity識別Tokenにしない | v0.18.3日本語Windows実機ログ | PL-F-005へ発展 |
 | PL-F-005 | failure | Provider間でState filter / lifecycle条件を揃える | v0.18.4でSVCLにはFxSound、Core Audio Active一覧には無し | 他Projectでも再発したらReliability / Integrationルールへ一般化 |
 | PL-F-006 | failure | 複数Entity Classが混在する外部一覧はType / Stable ID namespaceで先に絞る | v0.18.5でHigh Definition Audio Device指定がFirefox Application Sessionへ誤match | Electron / Reliabilityへ一般化候補 |
+| PL-F-007 | failure | Opaque / Stable IDを表示名から推測して再構成しない | v0.18.7で推測Endpoint IDが実SVCL IDに存在せずnot-found | Reliability一般則へ候補。実列挙値または安全なnamespace fallbackを使う |
 | PL-S-002 | success | 継続配布ElectronはRelease Metadataを揃えOne-click Updateを優先 | Setup Launcher v0.18.2+ | Guideへ反映済み。実機Update Evidenceを継続追加 |

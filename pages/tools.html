@@ -17,7 +17,7 @@
 <div class="split">
   <section class="panel flat">
     <span class="badge">WINDOWS</span>
-    <h2>osu Setup Launcher <span class="muted" id="launcherVersion">0.18.7</span></h2>
+    <h2>osu Setup Launcher <span class="muted" id="launcherVersion">0.18.8</span></h2>
     <p class="lead">osu!を始める前の準備をまとめて実行。</p>
     <div class="data-list">
       <div class="practice-card"><span>1</span><div><strong>音声出力切替</strong><small>SoundVolumeCommandLine / SVCL + Windows Core Audio Fallback</small></div><span></span></div>
@@ -27,7 +27,7 @@
       <div class="practice-card"><span>5</span><div><strong>One-click Update</strong><small>起動時に新版を確認し、1回の操作でDownload / Restart / Update</small></div><span></span></div>
     </div>
     <div class="actions"><a class="button primary" data-launcher-release href="https://github.com/EliteMay/osu-hub/releases/latest">Windows版をダウンロード</a><a class="button ghost" href="https://github.com/EliteMay/osu-hub" target="_blank" rel="noopener noreferrer">GitHubを見る</a></div>
-    <div class="notice" style="margin-top:16px"><strong>配布版: v0.18.7</strong><br>v0.18.6実機で完全なHigh Definition Audio DeviceのEndpoint IDを入力しても一致しないケースを確認しました。日本語WindowsではWindowsパスの区切りがバックスラッシュではなく¥ / ￥として表示・入力される場合があるため、v0.18.7ではこれらを同じ区切りとして正規化します。Firefox等のApplication音声セッション除外と、曖昧な候補では安全停止する仕様は維持します。v0.18.2からアプリ内One-click Updateに対応しています。v0.18.1以前にはUpdaterが入っていないため、<strong>v0.18.2だけはSetup.exeを一度手動でインストール</strong>してください。</div>
+    <div class="notice" style="margin-top:16px"><strong>配布版: v0.18.8</strong><br>v0.18.7実機で、推測した完全Endpoint IDが実際のSVCL IDと一致せず「一致する再生デバイスが見つからない」となるケースを確認しました。v0.18.8では完全IDが一致しない場合だけ、そのIDに含まれるAudio Providerへ安全にFallbackし、Application音声セッションを除外した後の唯一のActive Render Endpointを選びます。同じProviderのActive候補が複数あり同点なら、従来どおり勝手に切り替えず停止します。v0.18.2からアプリ内One-click Updateに対応しています。v0.18.1以前にはUpdaterが入っていないため、<strong>v0.18.2だけはSetup.exeを一度手動でインストール</strong>してください。</div>
   </section>
   <aside class="stack">
     <section class="panel flat"><p class="eyebrow">update flow</p><h2>v0.18.2以降</h2><p class="muted">起動時にGitHub Releasesを確認し、新版がある場合だけ通知します。「今すぐ更新」でDownload後にアプリを再起動して更新。失敗した場合は現在版をそのまま使い、Releaseページから手動更新できます。</p></section>
