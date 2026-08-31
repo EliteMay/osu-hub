@@ -8,6 +8,7 @@ on:
       - "package.json"
       - "src/**"
       - "tools/**"
+      - "tests/validate-audio-interop.mjs"
       - "data/config.json"
       - "version.json"
   push:
@@ -18,6 +19,7 @@ on:
       - "package.json"
       - "src/**"
       - "tools/**"
+      - "tests/validate-audio-interop.mjs"
       - "data/config.json"
       - "version.json"
 
@@ -53,6 +55,9 @@ jobs:
           node --check src/main.js
           node --check src/preload.js
           node --check src/renderer/app.js
+
+      - name: Check audio interop regression guards
+        run: node tests/validate-audio-interop.mjs
 
       - name: Build installer
         run: npm run build:win
