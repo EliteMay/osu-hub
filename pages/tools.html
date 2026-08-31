@@ -17,19 +17,20 @@
 <div class="split">
   <section class="panel flat">
     <span class="badge">WINDOWS</span>
-    <h2>osu Setup Launcher <span class="muted" id="launcherVersion">0.18.8</span></h2>
+    <h2>osu Setup Launcher <span class="muted" id="launcherVersion">0.18.9</span></h2>
     <p class="lead">osu!を始める前の準備をまとめて実行。</p>
     <div class="data-list">
-      <div class="practice-card"><span>1</span><div><strong>音声出力切替</strong><small>SoundVolumeCommandLine / SVCL + Windows Core Audio Fallback</small></div><span></span></div>
+      <div class="practice-card"><span>1</span><div><strong>音声出力切替</strong><small>検出した再生デバイスを一覧から選択。内部では正確なEndpoint IDを保存</small></div><span></span></div>
       <div class="practice-card"><span>2</span><div><strong>OpenTabletDriver</strong><small>設定したアプリを起動</small></div><span></span></div>
       <div class="practice-card"><span>3</span><div><strong>遅延対策アプリ</strong><small>REALなどを起動</small></div><span></span></div>
       <div class="practice-card"><span>4</span><div><strong>osu!lazer</strong><small>自動検出または指定パスから起動</small></div><span></span></div>
       <div class="practice-card"><span>5</span><div><strong>One-click Update</strong><small>起動時に新版を確認し、1回の操作でDownload / Restart / Update</small></div><span></span></div>
     </div>
     <div class="actions"><a class="button primary" data-launcher-release href="https://github.com/EliteMay/osu-hub/releases/latest">Windows版をダウンロード</a><a class="button ghost" href="https://github.com/EliteMay/osu-hub" target="_blank" rel="noopener noreferrer">GitHubを見る</a></div>
-    <div class="notice" style="margin-top:16px"><strong>配布版: v0.18.8</strong><br>v0.18.7実機で、推測した完全Endpoint IDが実際のSVCL IDと一致せず「一致する再生デバイスが見つからない」となるケースを確認しました。v0.18.8では完全IDが一致しない場合だけ、そのIDに含まれるAudio Providerへ安全にFallbackし、Application音声セッションを除外した後の唯一のActive Render Endpointを選びます。同じProviderのActive候補が複数あり同点なら、従来どおり勝手に切り替えず停止します。v0.18.2からアプリ内One-click Updateに対応しています。v0.18.1以前にはUpdaterが入っていないため、<strong>v0.18.2だけはSetup.exeを一度手動でインストール</strong>してください。</div>
+    <div class="notice" style="margin-top:16px"><strong>配布版: v0.18.9</strong><br>実Windowsで <code>High Definition Audio Device\Device\スピーカー\Render</code> を指定すると、目的の「スピーカー (High Definition Audio Device)」へ切り替えられることを確認しました。v0.18.9ではこのIDを自分で探して入力する必要をなくし、SVCLで検出した実際の再生デバイスを「スピーカー (High Definition Audio Device)」のような一覧から選べます。選択時は正確なEndpoint IDを設定へ保存し、詳細IDの手入力は上級者向けとして残します。Firefox等のApplication音声セッション除外と曖昧候補での安全停止は維持します。v0.18.2からアプリ内One-click Updateに対応しています。v0.18.1以前にはUpdaterが入っていないため、<strong>v0.18.2だけはSetup.exeを一度手動でインストール</strong>してください。</div>
   </section>
   <aside class="stack">
+    <section class="panel flat"><p class="eyebrow">audio picker</p><h2>IDを手入力しない</h2><p class="muted">通常はLauncherが検出した再生デバイスから選ぶだけです。「再検出」で現在のWindows出力一覧を読み直せます。選択後は「音声だけテスト」で切替を確認できます。</p></section>
     <section class="panel flat"><p class="eyebrow">update flow</p><h2>v0.18.2以降</h2><p class="muted">起動時にGitHub Releasesを確認し、新版がある場合だけ通知します。「今すぐ更新」でDownload後にアプリを再起動して更新。失敗した場合は現在版をそのまま使い、Releaseページから手動更新できます。</p></section>
     <section class="panel flat"><p class="eyebrow">web / desktop split</p><h2>役割を分離</h2><p class="muted">osu! Hub本体はGitHub Pagesで動作。音声切替や外部アプリ起動、アプリ更新はDesktop Tools側で担当。</p></section>
   </aside>
