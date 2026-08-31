@@ -26,7 +26,7 @@
     <div>
       <p class="eyebrow">osu! api sync</p>
       <h1>Account Sync</h1>
-      <p class="lead">Cloudflare Worker経由でosu! API v2の公開プロフィールと最近のプレイを取得し、Resultsへ自動保存する。ブラウザへosu! Client ID / Client Secretを入力する必要はありません。</p>
+      <p class="lead">Supabase Edge Function経由でosu! API v2の公開プロフィールと最近のプレイを取得し、Resultsへ自動保存する。ブラウザへosu! Client ID / Client Secretを入力する必要はありません。</p>
     </div>
   </section>
 
@@ -42,9 +42,9 @@
       <div class="panel-title"><div><p class="eyebrow">connection</p><h2>同期設定</h2></div></div>
       <form id="accountForm" class="form-grid">
         <div class="field full">
-          <label for="workerUrl">Cloudflare Worker URL</label>
-          <input id="workerUrl" name="workerUrl" type="url" inputmode="url" placeholder="https://osu-hub-api.xxxxx.workers.dev" aria-describedby="workerHelp">
-          <small id="workerHelp" class="muted">本番はHTTPSのみ。ローカル開発時だけlocalhost / 127.0.0.1のHTTPを許可します。</small>
+          <label for="endpointUrl">Supabase Sync API URL</label>
+          <input id="endpointUrl" name="endpointUrl" type="url" inputmode="url" placeholder="https://xxxx.supabase.co/functions/v1/osu-sync" aria-describedby="endpointHelp">
+          <small id="endpointHelp" class="muted">通常は変更不要。接続先はdata/site.jsonの本番設定を使います。</small>
         </div>
         <div class="field">
           <label for="osuUser">osu! User ID / ユーザー名</label>
@@ -73,12 +73,12 @@
         <div class="field full">
           <div class="actions">
             <button class="button ghost" type="submit">設定を保存</button>
-            <button id="testWorker" class="button ghost" type="button">Worker接続テスト</button>
+            <button id="testService" class="button ghost" type="button">接続テスト</button>
             <button id="syncNow" class="button primary" type="button">今すぐ同期</button>
           </div>
         </div>
       </form>
-      <div id="syncStatus" class="notice" role="status" aria-live="polite" style="margin-top:18px">Worker URLとosu!アカウントを設定してください。</div>
+      <div id="syncStatus" class="notice" role="status" aria-live="polite" style="margin-top:18px">osu!アカウントを入力して接続テストしてください。</div>
     </section>
 
     <aside class="stack">
@@ -94,14 +94,14 @@
         </div>
       </section>
       <section class="panel flat">
-        <div class="notice"><strong>ブラウザへのosu! Secret入力は不要</strong><br>同期用の短期Access TokenはGitHub Actionsで自動更新し、Cloudflare WorkerにはAccess Tokenだけを保存します。Client SecretをこのWeb画面へ入力・保存することはありません。</div>
+        <div class="notice"><strong>ブラウザへのosu! Secret入力は不要</strong><br>Client ID / Client SecretはGitHub Actions内だけで使い、Supabaseには短期Access Tokenだけを保存します。このWeb画面へ秘密情報を入力・保存することはありません。</div>
       </section>
     </aside>
   </div>
 
   <section class="panel">
     <div class="panel-title"><div><p class="eyebrow">latest sync</p><h2>今回取得したリザルト</h2></div><a href="./results.html">Resultsで見る →</a></div>
-    <div id="syncPreview" class="list-empty">まだ同期していません。Worker接続テスト後に「今すぐ同期」を実行してください。</div>
+    <div id="syncPreview" class="list-empty">まだ同期していません。「接続テスト」後に「今すぐ同期」を実行してください。</div>
   </section>
 </main>
 
