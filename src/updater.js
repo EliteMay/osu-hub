@@ -131,7 +131,7 @@ async function checkForAppUpdate({ prompt = false } = {}) {
         logs: [
           { type: "info", text: `現在の版: ${app.getVersion()}` },
           { type: "info", text: `公開版: ${latestVersion}` },
-          { type: updateAvailable ? "success" : "success", text: updateAvailable ? "新しい版があります。『今すぐ更新』で自動更新できます。" : "最新版です。" }
+          { type: "success", text: updateAvailable ? "新しい版があります。『今すぐ更新』で自動更新できます。" : "最新版です。" }
         ]
       };
     } catch (error) {
@@ -248,12 +248,11 @@ for (const channel of ["update:check", "update:open"]) {
 }
 
 ipcMain.handle("update:check", async () => checkForAppUpdate({ prompt: false }));
-ipcMain.handle("update:open", async (_event, url) => {
+ipcMain.handle("update:open", async () => {
   if (updateState.latestVersion && isNewerVersion(updateState.latestVersion, app.getVersion())) {
     return downloadAndInstall();
   }
-  const target = /^https?:\/\//i.test(String(url || "")) ? String(url) : RELEASE_URL;
-  await shell.openExternal(target);
+  await shell.openExternal(RELEASE_URL);
   return { ok: true, message: "Releaseページを開きました。" };
 });
 
