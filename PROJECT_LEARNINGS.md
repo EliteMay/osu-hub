@@ -46,6 +46,26 @@
 - Guide candidate: yes
 - Guide note: Windows固有操作は「command accepted」と「state verified」を分離する一般ルールにできる。
 
+### PL-F-003 同じ音声EndpointでもProviderごとにFriendly Nameの語順が違う
+
+- Date: 2026-08-31
+- Status: monitoring
+- Severity: high
+- Cost: medium
+- Symptom: v0.18.2ではSVCLが `FxSound Speakers` を検出して `/SetDefault` まで実行したが、Windows Core Audio Fallbackが `Device not found: FxSound Speakers` で失敗した。
+- Expected: SVCLとCore Audioで同じEndpointを異なる表示名で返しても、Fallbackで同一デバイスとして特定できる。
+- Actual: Core Audio側のFriendly Nameが `Speakers (FxSound Audio Enhancer)` のような表記の場合、連続部分文字列 `*FxSound Speakers*` では一致しなかった。
+- Trigger / Reproduction: FxSound仮想再生デバイスを対象に、SVCLの直接確認が失敗してCore Audio Fallbackへ入る。
+- Root Cause: デバイス名をProvider間で同一文字列だと仮定し、語順・括弧・Provider固有Prefix/Suffixを吸収していなかった。
+- Final Fix: `tools/switch_audio_device.ps1` に正規化、一般語除外Token、Score、`Find-BestRenderDeviceMatch`を追加。完全一致/部分一致を優先しつつ、`FxSound` と `Speakers` のような主要Tokenが語順に依存せず候補名へ全て含まれる場合も一致させる。
+- Affected files / systems: `tools/switch_audio_device.ps1`, Windows Core Audio fallback, Windows installer CI
+- Detection method: v0.18.2実Windowsログで `E_NOINTERFACE` が消え、失敗位置が `Device not found` まで進んだことで特定。
+- Regression Guard: PowerShell `-SelfTest` で `FxSound Speakers` → `Speakers (FxSound Audio Enhancer)` FixtureをWindows CI実行。`tests/validate-audio-interop.mjs`でMatcherとSelf Test実行を必須化。
+- Prevention: 複数Provider / API / OS層の表示名を永続IDのように扱わない。IDを共有できない場合は、正規化・Token化・曖昧一致の優先順位とFixtureを用意する。
+- Related Issue / PR / Commit: v0.18.3
+- Guide candidate: yes
+- Guide note: 外部Provider間のEntity照合ではDisplay Name完全一致を前提にしない、という一般化候補。
+
 ---
 
 ## Success
@@ -84,4 +104,5 @@
 |---|---|---|---|---|
 | PL-F-001 | failure | COM IID/GUIDは公式SDK照合 + Static Guardを持つ | v0.18.0 E_NOINTERFACE実機ログ | Electron / Windows固有機能ルールへ一般化できるか確認 |
 | PL-F-002 | failure | OS変更コマンド成功とread-back成功を分離 | v0.17.0〜v0.18.0音声確認失敗 | Reliability / Electron章への追加候補 |
+| PL-F-003 | failure | Provider間でDisplay Name完全一致を前提にしない | v0.18.2 `Device not found: FxSound Speakers` | 複数Projectでも再発した場合にReliability / Integrationルールへ一般化 |
 | PL-S-002 | success | 継続配布ElectronはRelease Metadataを揃えOne-click Updateを優先 | Setup Launcher v0.18.2 | Guide 1.6.0へ反映済み。次は実WindowsのN→N+1更新Evidenceを追加 |
