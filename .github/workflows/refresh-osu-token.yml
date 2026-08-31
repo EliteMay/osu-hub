@@ -10,6 +10,7 @@ on:
     paths:
       - ".github/workflows/refresh-osu-token.yml"
       - "data/site.json"
+      - "supabase/functions/osu-sync/**"
 
 permissions:
   contents: read
@@ -98,7 +99,7 @@ jobs:
             console.log(`Supabase token refresh: OK (expires ${value.expiresAt})`);
           ' "$response_file"
 
-      - name: Verify Supabase health and osu sync
+      - name: Verify Supabase health
         shell: bash
         run: |
           set -euo pipefail
@@ -115,23 +116,49 @@ jobs:
             if (value?.ok !== true || value?.configured !== true) throw new Error("Supabase sync health is not ready");
             if (value?.service !== "osu-hub-sync" || value?.provider !== "supabase-edge-function") throw new Error("Unexpected sync provider");
             if (value?.browserOAuthRequired !== false) throw new Error("Browser OAuth credentials must not be required");
+            if (!Array.isArray(value?.supportedScoreTypes) || !value.supportedScoreTypes.includes("recent") || !value.supportedScoreTypes.includes("best")) throw new Error("Recent / Best support is missing");
+            if (Number(value?.recentWindowHours) !== 24) throw new Error("Recent 24h metadata is missing");
             console.log("Supabase sync health: OK");
           '
 
+      - name: Smoke test Recent Plays
+        shell: bash
+        run: |
+          set -euo pipefail
           sync="$(curl --fail --silent --show-error \
             --connect-timeout 10 --max-time 30 \
             --request POST "$SYNC_ENDPOINT" \
             --header 'Accept: application/json' \
             --header 'Content-Type: application/json' \
-            --data '{"action":"sync","user":"2","mode":"osu","limit":1,"includeFails":true}')"
+            --data '{"action":"sync","user":"2","mode":"osu","scoreType":"recent","limit":1,"includeFails":true}')"
 
           printf '%s' "$sync" | node -e '
             const fs = require("fs");
             const value = JSON.parse(fs.readFileSync(0, "utf8"));
-            if (value?.apiVersion !== 1 || value?.provider !== "supabase-edge-function") throw new Error("Unexpected sync response");
-            if (!value?.user || Number(value.user.id) !== 2) throw new Error("Get User smoke test failed");
-            if (!Array.isArray(value.scores) || value.scores.length > 1) throw new Error("Recent Scores smoke test failed");
-            console.log(`Supabase account-sync smoke test: OK (${value.scores.length} recent score(s))`);
+            if (value?.apiVersion !== 2 || value?.provider !== "supabase-edge-function" || value?.scoreType !== "recent") throw new Error("Unexpected Recent response");
+            if (!value?.user || Number(value.user.id) !== 2) throw new Error("Recent Get User smoke failed");
+            if (!Array.isArray(value.scores) || value.scores.length > 1) throw new Error("Recent Scores smoke failed");
+            console.log(`Recent Plays smoke: OK (${value.scores.length} score(s))`);
+          '
+
+      - name: Smoke test Best Scores
+        shell: bash
+        run: |
+          set -euo pipefail
+          sync="$(curl --fail --silent --show-error \
+            --connect-timeout 10 --max-time 30 \
+            --request POST "$SYNC_ENDPOINT" \
+            --header 'Accept: application/json' \
+            --header 'Content-Type: application/json' \
+            --data '{"action":"sync","user":"2","mode":"osu","scoreType":"best","limit":1,"includeFails":false}')"
+
+          printf '%s' "$sync" | node -e '
+            const fs = require("fs");
+            const value = JSON.parse(fs.readFileSync(0, "utf8"));
+            if (value?.apiVersion !== 2 || value?.provider !== "supabase-edge-function" || value?.scoreType !== "best") throw new Error("Unexpected Best response");
+            if (!value?.user || Number(value.user.id) !== 2) throw new Error("Best Get User smoke failed");
+            if (!Array.isArray(value.scores) || value.scores.length > 1) throw new Error("Best Scores smoke failed");
+            console.log(`Best Scores smoke: OK (${value.scores.length} score(s))`);
           '
 
       - name: Record refresh result
@@ -145,6 +172,7 @@ jobs:
             echo "- Client Secret stored in Supabase: no"
             echo "- Access Token stored in RLS-protected table: yes"
             echo "- /health: OK"
-            echo "- Account Sync smoke: OK"
+            echo "- Recent Plays smoke: OK"
+            echo "- Best Scores smoke: OK"
             echo "- Trigger: ${GITHUB_EVENT_NAME}"
           } >> "$GITHUB_STEP_SUMMARY"
