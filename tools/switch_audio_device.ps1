@@ -36,14 +36,12 @@ function Get-AudioTokens([string]$Value) {
   $normalized = Normalize-AudioText $Value
   if ([string]::IsNullOrWhiteSpace($normalized)) { return @() }
 
-  # Device class / role words differ by Windows display language and provider.
-  # They are intentionally ignored so a stable vendor/product token (for example
-  # "fxsound") can bridge "FxSound Speakers" and "スピーカー (FxSound Audio Enhancer)".
+  # Device class / role words are not stable identifiers. The query-side class
+  # word can be English even when Windows renders the candidate in another locale.
   $stopWords = @(
     'audio', 'device', 'render', 'default', 'endpoint', 'output', 'high', 'definition',
     'speaker', 'speakers', 'headphone', 'headphones', 'headset', 'headsets',
-    'earphone', 'earphones', 'earbud', 'earbuds',
-    'スピーカー', 'ヘッドホン', 'ヘッドセット', 'イヤホン'
+    'earphone', 'earphones', 'earbud', 'earbuds'
   )
   $tokens = @()
   foreach ($token in ($normalized -split ' ')) {
@@ -135,14 +133,14 @@ function Find-BestRenderDeviceMatch {
 
 if ($SelfTest.IsPresent) {
   $fixtures = @(
-    [PSCustomObject]@{ Name = 'スピーカー (FxSound Audio Enhancer)'; Id = '{0.0.0.00000000}.{FXSOUND-JA}'; IsDefault = $false },
+    [PSCustomObject]@{ Name = 'Localized Output (FxSound Audio Enhancer)'; Id = '{0.0.0.00000000}.{FXSOUND-LOCALIZED}'; IsDefault = $false },
     [PSCustomObject]@{ Name = 'Speakers (FxSound Audio Enhancer)'; Id = '{0.0.0.00000000}.{FXSOUND-EN}'; IsDefault = $false },
     [PSCustomObject]@{ Name = '2- Arctis GameBuds'; Id = '{0.0.0.00000000}.{ARCTIS}'; IsDefault = $true }
   )
   $fixtureHint = 'FxSound Audio Enhancer\Device\FxSound Speakers\Render'
 
-  $fixtureMatchJa = Find-BestRenderDeviceMatch -Devices $fixtures -Expected 'FxSound Speakers' -Hint ''
-  if ($null -eq $fixtureMatchJa -or $fixtureMatchJa.Name -ne 'スピーカー (FxSound Audio Enhancer)') {
+  $fixtureMatchLocalized = Find-BestRenderDeviceMatch -Devices $fixtures -Expected 'FxSound Speakers' -Hint ''
+  if ($null -eq $fixtureMatchLocalized -or $fixtureMatchLocalized.Name -ne 'Localized Output (FxSound Audio Enhancer)') {
     Write-Error 'AUDIO_MATCH_SELF_TEST_FAILED: localized FxSound fixture did not resolve from FxSound Speakers.'
     exit 20
   }
