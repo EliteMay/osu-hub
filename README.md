@@ -45,19 +45,33 @@ Edge Function URLは公開Endpointです。osu! Client SecretやAccess TokenはG
 
 ## Account Sync
 
-`pages/account.html` からSupabase Edge Function経由でosu! API v2の公開プロフィール情報とRecent Scoresを同期します。
+`pages/account.html` からSupabase Edge Function経由でosu! API v2の公開プロフィール情報とスコアを同期します。
 
-- osu! User ID / username
-- Ruleset
-- Recent Scores 1〜100件
-- Failスコアを含める設定
-- `osu:<score id>` で重複整理
+### Recent Plays
+
+- osu!のRecent Playsは**直近24時間**
+- 1〜100件取得
+- Failを含める / 含めないを選択可能
+- Account Sync画面を開いている間は、既定で5分以上空いたときRecentを自動同期
+- ブラウザを閉じている間は自動同期しない
+
+### Best Scores
+
+- 自己ベスト上位を1〜100件取得
+- 古いBestもResultsへ追加できる
+- Bestは成功スコアのみなのでFail設定は使用しない
+
+### 蓄積ルール
+
+- Result IDは `osu:<score id>`
+- 同一Score IDは増やさず更新
 - 手入力Resultsは削除しない
 - API同期済みResultの手動メモは再同期で維持
+- `syncKinds` に `recent` / `best` の取得経路を蓄積
 - Browser timeout 15秒 / Edge Function upstream timeout 12秒
 - API ResponseをBrowser側でもValidation
 
-### Secret / Token方針
+## Secret / Token方針
 
 ブラウザへosu! Client ID / Client Secretを入力しません。
 
@@ -101,36 +115,24 @@ supabase/
 
 `osu-sync` は次の3 actionを受けます。
 
-- `health`: Token状態確認
+- `health`: Token状態とRecent / Best対応状態を確認
 - `refresh`: GitHub ActionsからClient Credentialsを受け取り、osu! Access Tokenを更新
-- `sync`: osu! User / Recent Scoresを取得しosu! Hub用JSONへ正規化
+- `sync`: `scoreType=recent|best` でUser / Scoresを取得しosu! Hub用JSONへ正規化
 
 CORSはGitHub Pages originとlocalhost開発だけを許可します。
 
 ## GitHub Actions
 
-### Refresh osu API Token
-
-`.github/workflows/refresh-osu-token.yml`
-
-- 手動実行
-- Workflow / `data/site.json` のmain変更時
-- 12時間ごとのschedule
-
-で実行します。
+`.github/workflows/refresh-osu-token.yml` は手動、関連main変更、12時間ごとのscheduleで実行します。
 
 処理:
 
 1. GitHub Actions Secrets確認
 2. `data/site.json` からSupabase endpoint取得
-3. Edge Function `refresh` actionへClient ID / Secretを一時送信
-4. Edge Functionがosu! Access Tokenを発行・保存
-5. `health`を確認
-6. 公開User ID 2でRecent Scores 1件のend-to-end smoke test
-
-Web 0.2.6のmain反映後に、Token更新・`health configured=true`・Recent Scores smokeまで成功確認済みです。
-
-### Cloudflareについて
+3. Edge Function `refresh` actionでToken更新
+4. `health`を確認
+5. 公開User ID 2でRecent 1件をSmoke Test
+6. 公開User ID 2でBest 1件をSmoke Test
 
 Cloudflare Worker方式は本番でosu!側429を継続再現したため、Account Syncの現行Runtimeから削除しました。経緯はCHANGELOGとGit履歴に残しています。
 
@@ -181,7 +183,7 @@ Windows固有処理は実Windowsで未確認の項目を確認済み扱いしま
 
 Pages ArtifactはWebファイルだけを公開します。Supabase function source、Electron source、bat、Secret等はPages Artifactへ含めません。
 
-`tests/validate-web.mjs` / `Check web` では、JS/JSON/HTML、Version、Project Profile、Secret混入、Import Recovery、Supabase endpoint、Token更新Workflow、旧Cloudflare Runtime再混入などを確認します。
+`tests/validate-web.mjs` / `Check web` では、JS/JSON/HTML、Version、Project Profile、Secret混入、Import Recovery、Supabase endpoint、Recent / Best、5分自動蓄積、Token更新Workflow、旧Cloudflare Runtime再混入などを確認します。
 
 ## 崩してはいけない仕様
 
@@ -196,21 +198,12 @@ Pages ArtifactはWebファイルだけを公開します。Supabase function sou
 - Electron Launcherを削除しない
 - 外部Responseが想定形式でない場合に不正データを保存しない
 
-## 確認済み
-
-- Supabase project / Token Store migration / Edge Function deploy
-- PR #9 `Check web`
-- merge後main `Check web`
-- GitHub Pages deploy
-- `Refresh osu API Token` Workflow
-- Supabase `health configured=true`
-- Supabase → osu! API v2 Recent Scores end-to-end smoke
-
 ## 未確認 / 今後
 
-- ユーザー自身の実ブラウザAccount Sync → Results → Stats E2E
+- Web 0.2.7の実ブラウザでBest Scores 100件同期
+- Web 0.2.7のRecent自動蓄積を5分以上開いた実ブラウザで確認
 - Backup / Import / Rollbackの実ブラウザE2E
-- Recent Scoresの過去全履歴ページング同期
+- Recent Scoresの24時間より前を含む全履歴ページング同期
 - 同期済みResultsをAI Coachingへ直接選択して含める機能
 - Windows実機でのSetup Launcher確認
 - Setup.exe初回GitHub Release
