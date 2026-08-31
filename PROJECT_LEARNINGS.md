@@ -64,7 +64,7 @@
 ### PL-F-004 Provider間の表示名照合ではデバイス種別語もローカライズされる
 
 - Date: 2026-08-31
-- Status: monitoring
+- Status: superseded-by-PL-F-005
 - Severity: high
 - Cost: medium
 - Symptom: v0.18.3でも `FxSound Speakers` のCore Audio Fallbackが `Device not found` のままだった。
@@ -72,14 +72,33 @@
 - Actual: v0.18.3は `fxsound` と `speakers` の両Tokenを必須にしたため、Core Audio側が `スピーカー (FxSound Audio Enhancer)` のような日本語Friendly Nameだと `speakers` が一致しない。
 - Trigger / Reproduction: 日本語WindowsでFxSoundを使用し、SVCL direct verificationが失敗してCore Audio Fallbackへ入る。
 - Root Cause: `speaker / speakers / スピーカー` のようなデバイス種別語をEntity固有Tokenとして扱っていた。これらはProvider・OS表示言語で変わるため識別子として不安定。
-- Final Fix: v0.18.4でspeaker/headphone/headset/earphone系と日本語対応語をStop Word化し、`fxsound` 等の安定したVendor/Product Tokenを優先する。未一致時は `MATCH_TOKENS` と `AVAILABLE_DEVICES` をstderrにも含め、ユーザー画面だけで次のEvidenceを取得できるようにする。
+- Final Fix: v0.18.4でspeaker/headphone/headset/earphone系をStop Word化し、`fxsound` 等の安定したVendor/Product Tokenを優先した。ただしv0.18.4実機ではCore Audio Active一覧自体にFxSoundが存在せず、次の問題はPL-F-005として切り分けられた。
 - Affected files / systems: `tools/switch_audio_device.ps1`, `tests/validate-audio-interop.mjs`, Windows audio fallback diagnostics
-- Detection method: v0.18.3実Windowsログが新Matcherの `Device not found` 行まで進んだこと。
-- Regression Guard: PowerShell `-SelfTest` で `FxSound Speakers` → `スピーカー (FxSound Audio Enhancer)` を確認し、Arctisへの誤一致もNegative Fixtureで確認。Static validatorで日本語FixtureとStop Wordを必須化。
-- Prevention: Provider間Entity照合ではRole/Class/Localized Labelを強い識別Tokenにしない。StableなVendor/Product Tokenを優先し、実環境の候補一覧を失敗ログへ残す。
-- Related Issue / PR / Commit: v0.18.4
+- Detection method: v0.18.3実Windowsログ。
+- Regression Guard: PowerShell `-SelfTest` とStatic validator。
+- Prevention: Provider間Entity照合ではRole/Class/Localized Labelを強い識別Tokenにしない。
+- Related Issue / PR / Commit: PR #17 / v0.18.4
 - Guide candidate: yes
-- Guide note: Display Nameだけで外部Provider間EntityをJoinする場合、ローカライズ可能な一般語を識別子扱いしないという一般化候補。
+
+### PL-F-005 Providerごとに列挙対象のDevice Stateが違うと「片方にだけ存在する」
+
+- Date: 2026-08-31
+- Status: monitoring
+- Severity: high
+- Cost: high
+- Symptom: v0.18.4ではMatcherが `fxsound` だけを必要とする状態まで改善したが、Core Audioの `AVAILABLE_DEVICES` にFxSoundが1件も出ず、引き続き既定出力を確認できなかった。
+- Expected: SVCLで見つかったFxSound EndpointをCore Audioでも状態付きで確認し、必要ならActive化してから切り替える。
+- Actual: LauncherのSVCL一覧は `/ShowDisabledDevices 1 /ShowUnpluggedDevices 1` を指定していたためActive以外も含む一方、`AudioSwitcher.cs` は `EnumAudioEndpoints(... DeviceState.Active)` のみだった。Provider間で見ている集合が違い、名前Matcherを改善しても解決しない状態だった。
+- Trigger / Reproduction: FxSound EndpointがActive以外のStateにあるPCで、SVCL一覧から対象を選びCore Audio Fallbackへ入る。
+- Root Cause: Provider間で同じ「再生デバイス一覧」を扱っているつもりでも、State filter / visibility条件を揃えていなかった。またFxSoundのようなVirtual EndpointはCompanion Appの起動状態によってEndpointが利用可能になるため、既定出力切替だけ先に実行しても成立しない場合がある。
+- Final Fix: v0.18.5でCore AudioのAll stateを列挙し `State` / `IsActive` を保持する。FxSound targetでは `FxSound.exe` 起動、DisabledならSVCL `/Enable`、Active化Pollingの後に既定出力を再設定する。Active化できなければState付きで明示的に失敗する。
+- Affected files / systems: `tools/AudioSwitcher.cs`, `tools/switch_audio_device.ps1`, `tests/validate-audio-interop.mjs`
+- Detection method: v0.18.4実Windowsログの `AVAILABLE_DEVICES` にFxSoundが存在しないことと、SVCL一覧取得コードのShowDisabled/ShowUnplugged設定を照合。
+- Regression Guard: C# All-state API / State propertyのStatic Guard、PowerShell Self TestでActive候補優先、Windows CIでPowerShell 5.1 parse / C# compile。
+- Prevention: 複数ProviderのEntity一覧を比較するときは、ID/NameだけでなくState filter・visibility・権限・lifecycle条件も揃える。Virtual Deviceを操作する場合はCompanion Process/Driver readinessを前提条件として扱う。
+- Related Issue / PR / Commit: PR #18 / v0.18.5
+- Guide candidate: yes
+- Guide note: OS統合では「Provider Aで存在する」ことを「Provider BでもActive」と同一視しない、というReliability一般化候補。
 
 ---
 
@@ -117,5 +136,6 @@
 | PL-F-001 | failure | COM IID/GUIDは公式SDK照合 + Static Guardを持つ | v0.18.0 E_NOINTERFACE実機ログ | Electron / Windows固有機能ルールへ一般化候補 |
 | PL-F-002 | failure | OS変更コマンド成功とread-back成功を分離 | v0.17.0〜v0.18.0 | Reliability / Electron章への追加候補 |
 | PL-F-003 | failure | Provider間でDisplay Name完全一致を前提にしない | v0.18.2 Device not found | PL-F-004へ発展 |
-| PL-F-004 | failure | ローカライズ可能なデバイス種別語をEntity識別Tokenにしない | v0.18.3日本語Windows実機ログ | 他Projectでも再発したらIntegrationルールへ一般化 |
+| PL-F-004 | failure | ローカライズ可能なデバイス種別語をEntity識別Tokenにしない | v0.18.3日本語Windows実機ログ | PL-F-005へ発展 |
+| PL-F-005 | failure | Provider間でState filter / lifecycle条件を揃える | v0.18.4でSVCLにはFxSound、Core Audio Active一覧には無し | 他Projectでも再発したらReliability / Integrationルールへ一般化 |
 | PL-S-002 | success | 継続配布ElectronはRelease Metadataを揃えOne-click Updateを優先 | Setup Launcher v0.18.2+ | Guideへ反映済み。実機Update Evidenceを継続追加 |
