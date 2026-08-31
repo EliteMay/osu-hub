@@ -16,7 +16,7 @@ const desktopPackage = json('package.json');
 const desktopUpdate = json('version.json');
 
 if (!/^\d+\.\d+\.\d+$/.test(String(site.siteVersion || ''))) fail('data/site.json siteVersion must use x.y.z format.');
-if (projectMeta.guideVersion !== '1.2.0') fail(`project-meta.json guideVersion must be 1.2.0 (actual: ${projectMeta.guideVersion}).`);
+if (projectMeta.guideVersion !== '1.3.0') fail(`project-meta.json guideVersion must be 1.3.0 (actual: ${projectMeta.guideVersion}).`);
 for (const profile of ['STATIC', 'DATA', 'AI-HANDOFF', 'CLOUD', 'ELECTRON', 'TOOL']) {
   if (!projectMeta.profiles?.includes(profile)) fail(`project-meta.json is missing profile: ${profile}`);
 }
@@ -26,6 +26,8 @@ if (projectMeta.runtimePolicy?.rendererOwnsDom !== true) fail('project-meta.json
 if (desktopPackage.version !== desktopUpdate.latestVersion || desktopPackage.version !== site.launcher?.version) {
   fail(`Desktop version mismatch: package=${desktopPackage.version}, version.json=${desktopUpdate.latestVersion}, site.json=${site.launcher?.version}`);
 }
+if (site.launcher?.latestReleaseUrl !== 'https://github.com/EliteMay/osu-hub/releases/latest') fail('launcher.latestReleaseUrl must point to GitHub Releases latest.');
+if (site.launcher?.releasesUrl !== 'https://github.com/EliteMay/osu-hub/releases') fail('launcher.releasesUrl must point to GitHub Releases.');
 
 if (site.osuApi?.provider !== 'Supabase Edge Functions') fail('osuApi.provider must be Supabase Edge Functions.');
 const endpoint = String(site.osuApi?.endpointUrl || '');
@@ -111,6 +113,11 @@ if (!/Recent Plays \(24h\)/.test(accountHtml) || !/Best Scores/.test(accountHtml
 if (/Cloudflare Worker/.test(accountHtml)) fail('Account Sync page must not present Cloudflare as the active provider.');
 if (/id=["'](?:clientId|clientSecret|osuClientId|osuClientSecret)["']/i.test(accountHtml)) fail('Account Sync page must not expose Client ID / Secret input fields.');
 
+const toolsHtml = read('pages/tools.html');
+if (!/href=["']https:\/\/github\.com\/EliteMay\/osu-hub\/releases\/latest["']/.test(toolsHtml)) fail('Desktop Tools download button must point to the latest GitHub Release.');
+if (!/配布中:\s*v0\.17\.0/.test(toolsHtml)) fail('Desktop Tools must show the published launcher version.');
+if (/Setup\.exeの初回配布は未確認/.test(toolsHtml)) fail('Desktop Tools must not show the old unreleased notice after publication.');
+
 const refreshWorkflow = read('.github/workflows/refresh-osu-token.yml');
 for (const marker of ['OSU_CLIENT_ID', 'OSU_CLIENT_SECRET', 'data/site.json', 'action: "refresh"', 'action":"health', 'supabase-edge-function', 'scoreType":"recent', 'scoreType":"best', 'Recent Plays smoke', 'Best Scores smoke']) {
   if (!refreshWorkflow.includes(marker)) fail(`refresh-osu-token.yml: missing Supabase token lifecycle guard ${marker}.`);
@@ -121,6 +128,12 @@ if (/CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCOUNT_ID|wrangler-action/.test(refreshWor
 const checkWorkflow = read('.github/workflows/check-web.yml');
 if (!/\.github\/workflows\/refresh-osu-token\.yml/.test(checkWorkflow)) fail('Check web path filters must include refresh-osu-token.yml.');
 if (!/supabase\/functions\/\*\*/.test(checkWorkflow)) fail('Check web path filters must include supabase/functions/**.');
+
+if (!fs.existsSync(path.join(root, '.github/workflows/build-windows.yml'))) fail('Windows build/release workflow must exist.');
+const windowsWorkflow = fs.existsSync(path.join(root, '.github/workflows/build-windows.yml')) ? read('.github/workflows/build-windows.yml') : '';
+for (const marker of ['contents: write', 'Verify installer', 'gh release create', 'gh release upload', 'osu_setup_${version}_setup.exe']) {
+  if (windowsWorkflow && !windowsWorkflow.includes(marker)) fail(`build-windows.yml: missing release guard ${marker}.`);
+}
 
 const publicFiles = ['index.html', ...htmlFiles.filter((file) => file !== 'index.html'), ...webJsFiles, 'data/site.json'];
 const assignedSecret = /(?:OSU_CLIENT_SECRET|clientSecret|apiSecret)\s*[:=]\s*["'][^"']{4,}["']/i;
@@ -150,4 +163,4 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log(`Validated ${htmlFiles.length} HTML files, project metadata, versions, Recent/Best Supabase Account Sync guards, auto accumulation, token refresh policy, stable runtime paths, import recovery guards, and responsive/accessibility/security rules: OK`);
+console.log(`Validated ${htmlFiles.length} HTML files, project metadata, versions, launcher release guards, Recent/Best Supabase Account Sync guards, auto accumulation, token refresh policy, stable runtime paths, import recovery guards, and responsive/accessibility/security rules: OK`);
