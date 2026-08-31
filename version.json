@@ -1,5 +1,5 @@
 {
-  "latestVersion": "0.18.5",
+  "latestVersion": "0.18.6",
   "downloadUrl": "https://github.com/EliteMay/osu-hub/releases/latest",
-  "releaseNotes": "v0.18.4実機ログでFxSoundがSVCLには存在する一方、Core AudioのActive一覧には存在しないことを確認。v0.18.5ではCore AudioのDisabled/Unplugged/NotPresentも診断し、FxSound対象時はFxSound.exe起動、Disabled時はSVCL /Enable、Active化待機の後に既定出力を再設定します。失敗時は各EndpointのStateもログへ表示します。"
+  "releaseNotes": "v0.18.5実機ログでHigh Definition Audio Deviceを指定した際、SVCLのアプリ音声セッション Firefox（\\Application\\Firefox）を出力デバイスと誤認する問題を確認。v0.18.6ではApplicationセッションを候補から除外し、\\Device\\...\\Render の実デバイスEndpointだけを対象にする。GenericなProvider名ではActive Endpointを優先し、同点候補は勝手に切り替えず停止する。"
 }
