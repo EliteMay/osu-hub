@@ -1,4 +1,0 @@
-# Local development only. Never commit a real token.
-# Production OSU_ACCESS_TOKEN is refreshed by GitHub Actions and stored as a Cloudflare Worker secret.
-# Generate a temporary client-credentials access token outside the Worker when testing local sync.
-OSU_ACCESS_TOKEN=replace_with_short_lived_access_token

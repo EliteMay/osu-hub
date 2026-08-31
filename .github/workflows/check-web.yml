@@ -17,10 +17,9 @@ on:
       - "CHANGELOG.md"
       - "仕様書.md"
       - "作業報告書.md"
-      - "cloudflare/worker/**"
+      - "supabase/functions/**"
       - "tests/**"
       - ".github/workflows/check-web.yml"
-      - ".github/workflows/deploy-worker.yml"
       - ".github/workflows/refresh-osu-token.yml"
   pull_request:
     branches: [main]
@@ -38,10 +37,9 @@ on:
       - "CHANGELOG.md"
       - "仕様書.md"
       - "作業報告書.md"
-      - "cloudflare/worker/**"
+      - "supabase/functions/**"
       - "tests/**"
       - ".github/workflows/check-web.yml"
-      - ".github/workflows/deploy-worker.yml"
       - ".github/workflows/refresh-osu-token.yml"
   workflow_dispatch:
 
@@ -61,7 +59,6 @@ jobs:
           node --check js/app.js
           node --check js/osu-sync.js
           node --check js/site-meta.js
-          node --check cloudflare/worker/src/index.js
           node --check tests/validate-web.mjs
 
       - name: Check JSON
@@ -71,7 +68,6 @@ jobs:
           python -m json.tool project-meta.json > /dev/null
           python -m json.tool version.json > /dev/null
           python -m json.tool package.json > /dev/null
-          python -m json.tool cloudflare/worker/package.json > /dev/null
 
       - name: Validate web project
         run: node tests/validate-web.mjs

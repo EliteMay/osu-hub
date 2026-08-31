@@ -15,35 +15,25 @@ const projectMeta = json('project-meta.json');
 const desktopPackage = json('package.json');
 const desktopUpdate = json('version.json');
 
-if (!/^\d+\.\d+\.\d+$/.test(String(site.siteVersion || ''))) {
-  fail('data/site.json siteVersion must use x.y.z format.');
-}
-if (projectMeta.guideVersion !== '1.2.0') {
-  fail(`project-meta.json guideVersion must be 1.2.0 (actual: ${projectMeta.guideVersion}).`);
-}
-const requiredProfiles = ['STATIC', 'DATA', 'AI-HANDOFF', 'CLOUD', 'ELECTRON', 'TOOL'];
-for (const profile of requiredProfiles) {
+if (!/^\d+\.\d+\.\d+$/.test(String(site.siteVersion || ''))) fail('data/site.json siteVersion must use x.y.z format.');
+if (projectMeta.guideVersion !== '1.2.0') fail(`project-meta.json guideVersion must be 1.2.0 (actual: ${projectMeta.guideVersion}).`);
+for (const profile of ['STATIC', 'DATA', 'AI-HANDOFF', 'CLOUD', 'ELECTRON', 'TOOL']) {
   if (!projectMeta.profiles?.includes(profile)) fail(`project-meta.json is missing profile: ${profile}`);
 }
-if (projectMeta.sourcesOfTruth?.webVersion !== 'data/site.json#siteVersion') {
-  fail('Web version Source of Truth must be data/site.json#siteVersion.');
-}
-if (projectMeta.runtimePolicy?.stablePaths !== true || projectMeta.runtimePolicy?.versionedRuntimeFolders !== false) {
-  fail('project-meta.json must declare stable runtime paths and no versioned runtime folders.');
-}
-if (projectMeta.runtimePolicy?.rendererOwnsDom !== true) {
-  fail('project-meta.json must record Renderer owns its DOM policy.');
-}
+if (projectMeta.sourcesOfTruth?.webVersion !== 'data/site.json#siteVersion') fail('Web version Source of Truth must be data/site.json#siteVersion.');
+if (projectMeta.runtimePolicy?.stablePaths !== true || projectMeta.runtimePolicy?.versionedRuntimeFolders !== false) fail('project-meta.json must declare stable runtime paths and no versioned runtime folders.');
+if (projectMeta.runtimePolicy?.rendererOwnsDom !== true) fail('project-meta.json must record Renderer owns its DOM policy.');
 if (desktopPackage.version !== desktopUpdate.latestVersion || desktopPackage.version !== site.launcher?.version) {
   fail(`Desktop version mismatch: package=${desktopPackage.version}, version.json=${desktopUpdate.latestVersion}, site.json=${site.launcher?.version}`);
 }
-if (site.osuApi?.workerUrl && !String(site.osuApi.workerUrl).startsWith('https://')) {
-  fail('Default production Worker URL must use HTTPS.');
-}
+
+if (site.osuApi?.provider !== 'Supabase Edge Functions') fail('osuApi.provider must be Supabase Edge Functions.');
+const endpoint = String(site.osuApi?.endpointUrl || '');
+if (!/^https:\/\/[^/]+\.supabase\.co\/functions\/v1\/osu-sync$/.test(endpoint)) fail('osuApi.endpointUrl must be the HTTPS Supabase osu-sync Edge Function URL.');
+if ('workerUrl' in (site.osuApi || {})) fail('Legacy Cloudflare workerUrl must not remain in data/site.json.');
+if ('clientSecret' in (site.osuApi || {}) || 'secret' in (site.osuApi || {})) fail('data/site.json must not contain secret fields.');
 const timeout = Number(site.osuApi?.requestTimeoutMs);
-if (!Number.isFinite(timeout) || timeout < 3000 || timeout > 60000) {
-  fail('osuApi.requestTimeoutMs must be between 3000 and 60000.');
-}
+if (!Number.isFinite(timeout) || timeout < 3000 || timeout > 60000) fail('osuApi.requestTimeoutMs must be between 3000 and 60000.');
 
 const htmlFiles = [
   'index.html',
@@ -62,26 +52,18 @@ for (const file of htmlFiles) {
   const ids = [...source.matchAll(/\bid=["']([^"']+)["']/g)].map((match) => match[1]);
   const duplicates = ids.filter((id, index) => ids.indexOf(id) !== index);
   if (duplicates.length) fail(`${file}: duplicate id(s): ${[...new Set(duplicates)].join(', ')}`);
-
   if (!/<html\b[^>]*\blang=["']ja["']/i.test(source)) fail(`${file}: html lang="ja" is required.`);
   if (!/<meta\b[^>]*name=["']viewport["']/i.test(source)) fail(`${file}: viewport meta is required.`);
-  if (!/<nav\b[^>]*class=["'][^"']*\bnav\b[^"']*["'][^>]*aria-label=/i.test(source)) {
-    fail(`${file}: main nav must have aria-label.`);
-  }
+  if (!/<nav\b[^>]*class=["'][^"']*\bnav\b[^"']*["'][^>]*aria-label=/i.test(source)) fail(`${file}: main nav must have aria-label.`);
   if (!/data-site-version/.test(source)) fail(`${file}: footer must use data-site-version.`);
   if (/osu!\s*Hub\s+v\d+\.\d+\.\d+/i.test(source)) fail(`${file}: hardcoded web version found.`);
-
-  const labelsWithoutFor = [...source.matchAll(/<label\b(?![^>]*\bfor=)[^>]*>/gi)];
-  if (labelsWithoutFor.length) fail(`${file}: label without for attribute found.`);
-
+  if ([...source.matchAll(/<label\b(?![^>]*\bfor=)[^>]*>/gi)].length) fail(`${file}: label without for attribute found.`);
   for (const match of source.matchAll(/\b(?:href|src)=["']([^"']+)["']/gi)) {
     const target = localTarget(file, match[1]);
     if (target && !fs.existsSync(target)) fail(`${file}: missing local reference ${match[1]}`);
   }
-
   for (const match of source.matchAll(/<a\b[^>]*target=["']_blank["'][^>]*>/gi)) {
-    const tag = match[0];
-    if (!/rel=["'][^"']*noopener[^"']*["']/i.test(tag)) fail(`${file}: target=_blank link is missing noopener.`);
+    if (!/rel=["'][^"']*noopener[^"']*["']/i.test(match[0])) fail(`${file}: target=_blank link is missing noopener.`);
   }
 }
 
@@ -94,15 +76,11 @@ const webJsFiles = fs.readdirSync(path.join(root, 'js')).filter((name) => name.e
 for (const file of webJsFiles) {
   const source = read(file);
   if (/\bMutationObserver\b/.test(source)) fail(`${file}: MutationObserver DOM patching is not allowed in the stable runtime.`);
-  if (/\bv\d{2,}[\\/]/i.test(file) || /(?:^|[-_.])v\d{2,}(?:[-_.]|$)/i.test(path.basename(file))) {
-    fail(`${file}: versioned runtime path detected.`);
-  }
+  if (/\bv\d{2,}[\\/]/i.test(file) || /(?:^|[-_.])v\d{2,}(?:[-_.]|$)/i.test(path.basename(file))) fail(`${file}: versioned runtime path detected.`);
 }
 for (const dir of ['js', 'css']) {
   for (const name of fs.readdirSync(path.join(root, dir))) {
-    if (/^v\d+/i.test(name) || /(?:^|[-_.])v\d{2,}(?:[-_.]|$)/i.test(name)) {
-      fail(`${dir}/${name}: versioned runtime path detected.`);
-    }
+    if (/^v\d+/i.test(name) || /(?:^|[-_.])v\d{2,}(?:[-_.]|$)/i.test(name)) fail(`${dir}/${name}: versioned runtime path detected.`);
   }
 }
 
@@ -112,108 +90,56 @@ for (const marker of ['recoverySnapshot', 'verifyImported', 'replaceAllStores', 
 }
 if (!/const\s+SCHEMA_VERSION\s*=\s*1\b/.test(storageSource)) fail('js/storage.js: SCHEMA_VERSION must be explicit.');
 
-const workerSource = read('cloudflare/worker/src/index.js');
-for (const marker of ['caches.default', 'SYNC_CACHE_TTL_SECONDS', 'Retry-After', 'OSU_ACCESS_TOKEN', 'Authorization', 'Bearer', 'OSU_API_ORIGIN', '/scores/recent']) {
-  if (!workerSource.includes(marker)) fail(`cloudflare/worker/src/index.js: missing API v2 sync guard ${marker}.`);
-}
-if (!/SYNC_CACHE_TTL_SECONDS\s*=\s*60\b/.test(workerSource)) {
-  fail('Worker sync cache TTL must remain at the documented one-minute polling interval.');
-}
-if (!/response\.status\s*===\s*429/.test(workerSource)) {
-  fail('Worker must handle upstream 429 responses explicitly.');
-}
-if (!/response\.status\s*===\s*401/.test(workerSource)) {
-  fail('Worker must handle expired or invalid access tokens explicitly.');
-}
-if (/OSU_CLIENT_ID|OSU_CLIENT_SECRET|\/oauth\/token/.test(workerSource)) {
-  fail('Worker runtime must never contain osu! Client Credentials or call /oauth/token.');
-}
-if (!/upstreamMode:\s*['"]api-v2-preissued-token['"]/.test(workerSource)) {
-  fail('Worker health must identify api-v2-preissued-token upstream mode.');
-}
-if (!/browserOAuthRequired:\s*false/.test(workerSource) || !/tokenManagedBy:\s*['"]github-actions['"]/.test(workerSource)) {
-  fail('Worker health must identify browserOAuthRequired=false and GitHub Actions token management.');
-}
-
 const accountSyncSource = read('js/osu-sync.js');
-if (!/upstreamMode\s*!==\s*['"]api-v2-preissued-token['"]/.test(accountSyncSource)) {
-  fail('Account Sync UI must require the pre-issued-token API v2 Worker health mode.');
+for (const marker of ['endpointUrl', 'serviceFetch', "action: 'health'", "action: 'sync'", 'supabase-edge-function', 'browserOAuthRequired']) {
+  if (!accountSyncSource.includes(marker)) fail(`js/osu-sync.js: missing Supabase sync guard ${marker}.`);
 }
-if (!/browserOAuthRequired\s*!==\s*false/.test(accountSyncSource) || !/tokenManagedBy\s*!==\s*['"]github-actions['"]/.test(accountSyncSource)) {
-  fail('Account Sync UI must verify browserOAuthRequired=false and GitHub Actions token management.');
-}
+if (/Cloudflare Worker|workerFetch\(|normalizeWorkerUrl\(/.test(accountSyncSource)) fail('js/osu-sync.js must not use the legacy Cloudflare Worker runtime.');
+if (/clientSecret|OSU_CLIENT_SECRET/.test(accountSyncSource)) fail('Browser Account Sync runtime must not contain osu! Client Secret handling.');
 
 const accountHtml = read('pages/account.html');
-if (!/ブラウザへのosu! Secret入力は不要/.test(accountHtml)) {
-  fail('Account Sync page must explain that browser secret input is not required.');
-}
-if (/id=["'](?:clientId|clientSecret|osuClientId|osuClientSecret)["']/i.test(accountHtml)) {
-  fail('Account Sync page must not expose Client ID / Secret input fields.');
-}
-
-const deployWorkflow = read('.github/workflows/deploy-worker.yml');
-if (!/push:\s*[\s\S]*branches:\s*[\s\S]*main/.test(deployWorkflow)) {
-  fail('Worker deploy workflow must continuously deploy Worker changes from main.');
-}
-if (!/cloudflare\/worker\/\*\*/.test(deployWorkflow)) {
-  fail('Worker deploy workflow must be path-scoped to cloudflare/worker/**.');
-}
-if (/OSU_CLIENT_ID|OSU_CLIENT_SECRET/.test(deployWorkflow)) {
-  fail('Normal Worker deploy workflow must not require osu! Client Credentials.');
-}
-if (!/upstreamMode[^\n]*api-v2-preissued-token/.test(deployWorkflow)) {
-  fail('Worker deploy verification must assert api-v2-preissued-token health state.');
-}
-if (!/browserOAuthRequired[^\n]*false/.test(deployWorkflow) || !/tokenManagedBy[^\n]*github-actions/.test(deployWorkflow)) {
-  fail('Worker deploy verification must assert browserOAuthRequired=false and tokenManagedBy=github-actions.');
-}
-if (!/\/api\/sync\?user=2&mode=osu&limit=1&include_fails=1/.test(deployWorkflow)) {
-  fail('Worker deploy workflow must run an end-to-end /api/sync smoke test.');
-}
+if (!/ブラウザへのosu! Secret入力は不要/.test(accountHtml)) fail('Account Sync page must explain that browser secret input is not required.');
+if (!/Supabase Edge Function/.test(accountHtml)) fail('Account Sync page must identify the Supabase provider.');
+if (/Cloudflare Worker/.test(accountHtml)) fail('Account Sync page must not present Cloudflare as the active provider.');
+if (/id=["'](?:clientId|clientSecret|osuClientId|osuClientSecret)["']/i.test(accountHtml)) fail('Account Sync page must not expose Client ID / Secret input fields.');
 
 const refreshWorkflow = read('.github/workflows/refresh-osu-token.yml');
-for (const marker of ['OSU_CLIENT_ID', 'OSU_CLIENT_SECRET', 'OSU_ACCESS_TOKEN', 'https://osu.ppy.sh/oauth/token', '::add-mask::', 'https://osu.ppy.sh/api/v2/users/2/osu', 'secrets: |', '/api/sync?user=2&mode=osu&limit=1&include_fails=1']) {
-  if (!refreshWorkflow.includes(marker)) fail(`refresh-osu-token.yml: missing token lifecycle guard ${marker}.`);
+for (const marker of ['OSU_CLIENT_ID', 'OSU_CLIENT_SECRET', 'data/site.json', 'action: "refresh"', 'action":"health', 'action":"sync', 'supabase-edge-function']) {
+  if (!refreshWorkflow.includes(marker)) fail(`refresh-osu-token.yml: missing Supabase token lifecycle guard ${marker}.`);
 }
-if (!/cron:\s*["']17 \*\/12 \* \* \*["']/.test(refreshWorkflow)) {
-  fail('osu! token refresh workflow must run every 12 hours.');
-}
-if (!/tokenManagedBy[^\n]*github-actions/.test(refreshWorkflow) || !/upstreamMode[^\n]*api-v2-preissued-token/.test(refreshWorkflow)) {
-  fail('Token refresh workflow must verify the deployed Worker token-management mode.');
-}
+if (!/cron:\s*["']17 \*\/12 \* \* \*["']/.test(refreshWorkflow)) fail('osu! token refresh workflow must run every 12 hours.');
+if (/CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCOUNT_ID|wrangler-action/.test(refreshWorkflow)) fail('Token refresh workflow must not depend on Cloudflare.');
 
 const checkWorkflow = read('.github/workflows/check-web.yml');
-if (!/\.github\/workflows\/refresh-osu-token\.yml/.test(checkWorkflow)) {
-  fail('Check web path filters must include refresh-osu-token.yml.');
-}
+if (!/\.github\/workflows\/refresh-osu-token\.yml/.test(checkWorkflow)) fail('Check web path filters must include refresh-osu-token.yml.');
+if (!/supabase\/functions\/\*\*/.test(checkWorkflow)) fail('Check web path filters must include supabase/functions/**.');
 
-const publicFiles = [
-  'index.html',
-  ...htmlFiles.filter((file) => file !== 'index.html'),
-  ...webJsFiles,
-  'data/site.json',
-];
+const publicFiles = ['index.html', ...htmlFiles.filter((file) => file !== 'index.html'), ...webJsFiles, 'data/site.json'];
 const assignedSecret = /(?:OSU_CLIENT_SECRET|clientSecret|apiSecret)\s*[:=]\s*["'][^"']{4,}["']/i;
 for (const file of publicFiles) {
   if (assignedSecret.test(read(file))) fail(`${file}: possible secret value found in public web files.`);
 }
-if ('clientSecret' in (site.osuApi || {}) || 'secret' in (site.osuApi || {})) {
-  fail('data/site.json must not contain secret fields.');
-}
 
-for (const lockFile of ['package-lock.json', 'cloudflare/worker/package-lock.json']) {
-  if (!fs.existsSync(path.join(root, lockFile))) warn(`${lockFile} is not tracked; create it during the next dependency install/update.`);
+if (fs.existsSync(path.join(root, '.github/workflows/deploy-worker.yml'))) fail('Legacy Cloudflare deploy workflow must be removed from the active repository.');
+if (fs.existsSync(path.join(root, 'cloudflare/worker'))) fail('Legacy Cloudflare Worker runtime must be removed after Supabase migration.');
+
+if (!fs.existsSync(path.join(root, 'supabase/functions/osu-sync/index.ts'))) fail('Supabase Edge Function source must be tracked in GitHub.');
+const functionSource = fs.existsSync(path.join(root, 'supabase/functions/osu-sync/index.ts')) ? read('supabase/functions/osu-sync/index.ts') : '';
+for (const marker of ['osu_api_tokens', 'SUPABASE_SERVICE_ROLE_KEY', 'action === \'refresh\'', 'action === \'sync\'', 'action === \'health\'', 'CACHE_TTL_MS = 60000', 'Retry-After']) {
+  if (functionSource && !functionSource.includes(marker)) fail(`Supabase osu-sync function: missing guard ${marker}.`);
 }
+if (functionSource && /console\.log\([^\n]*(clientSecret|accessToken)/.test(functionSource)) fail('Supabase function must not log OAuth secrets or access tokens.');
+
+if (!fs.existsSync(path.join(root, 'package-lock.json'))) warn('package-lock.json is not tracked; create it during the next Electron dependency install/update.');
 
 if (warnings.length) {
   console.log('Warnings:');
   warnings.forEach((message) => console.log(`- ${message}`));
 }
-
 if (errors.length) {
   console.error('Validation failed:');
   errors.forEach((message) => console.error(`- ${message}`));
   process.exit(1);
 }
 
-console.log(`Validated ${htmlFiles.length} HTML files, project metadata, versions, pre-issued-token API v2 sync guards, token refresh/deployment policy, stable runtime paths, import recovery guards, and responsive/accessibility/security rules: OK`);
+console.log(`Validated ${htmlFiles.length} HTML files, project metadata, versions, Supabase Account Sync guards, token refresh policy, stable runtime paths, import recovery guards, and responsive/accessibility/security rules: OK`);

@@ -21,13 +21,13 @@
     return ['localhost', '127.0.0.1', '::1', '[::1]'].includes(String(hostname || '').toLowerCase());
   }
 
-  function normalizeWorkerUrl(value) {
+  function normalizeEndpointUrl(value) {
     const raw = String(value || '').trim().replace(/\/+$/, '');
-    if (!raw) throw new Error('Cloudflare Worker URLを入力してください。');
+    if (!raw) throw new Error('Supabase Sync API URLを入力してください。');
     const url = new URL(raw);
-    if (url.username || url.password) throw new Error('認証情報を含むWorker URLは使用できません。');
+    if (url.username || url.password) throw new Error('認証情報を含むAPI URLは使用できません。');
     if (url.protocol !== 'https:' && !(url.protocol === 'http:' && isLocalHost(url.hostname))) {
-      throw new Error('本番Worker URLはHTTPSを使用してください。');
+      throw new Error('本番Sync API URLはHTTPSを使用してください。');
     }
     url.search = '';
     url.hash = '';
@@ -66,7 +66,10 @@
     try {
       const response = await fetch(url, { ...options, signal: controller.signal });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || `Worker request failed (${response.status})`);
+      if (!response.ok) {
+        const retry = payload.retryAfter == null ? '' : ` (${payload.retryAfter}秒後に再試行)`;
+        throw new Error(`${payload.error || `Sync API request failed (${response.status})`}${retry}`);
+      }
       return payload;
     } catch (error) {
       if (error?.name === 'AbortError') throw new Error(`通信が${Math.round(timeoutMs / 1000)}秒でタイムアウトしました。再試行してください。`);
@@ -93,7 +96,7 @@
     ]);
     return {
       key: SETTINGS_KEY,
-      workerUrl: saved?.workerUrl || site?.osuApi?.workerUrl || '',
+      endpointUrl: saved?.endpointUrl || site?.osuApi?.endpointUrl || '',
       user: saved?.user || '',
       mode: saved?.mode || 'osu',
       limit: number(saved?.limit, site?.osuApi?.syncLimit || 100) || 100,
@@ -111,13 +114,14 @@
       ...current,
       ...extra,
       key: SETTINGS_KEY,
-      workerUrl: String($('#workerUrl').value || '').trim(),
+      endpointUrl: String($('#endpointUrl').value || '').trim(),
       user: String($('#osuUser').value || '').trim(),
       mode: $('#osuMode').value || 'osu',
       limit: Math.min(100, Math.max(1, number($('#syncLimit').value, 100))),
       includeFails: $('#includeFails').value !== '0',
     };
-    if (value.workerUrl) value.workerUrl = normalizeWorkerUrl(value.workerUrl);
+    if (value.endpointUrl) value.endpointUrl = normalizeEndpointUrl(value.endpointUrl);
+    delete value.workerUrl;
     await DB.put('settings', value);
     return value;
   }
@@ -128,23 +132,25 @@
     box.textContent = message;
   }
 
-  async function workerFetch(settings, path) {
-    const base = normalizeWorkerUrl(settings.workerUrl);
-    return fetchJson(`${base}${path}`, {
-      headers: { Accept: 'application/json' },
+  async function serviceFetch(settings, body) {
+    const endpoint = normalizeEndpointUrl(settings.endpointUrl);
+    return fetchJson(endpoint, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
       cache: 'no-store',
+      body: JSON.stringify(body),
     }, settings.requestTimeoutMs || DEFAULT_TIMEOUT_MS);
   }
 
   function validateHealth(payload) {
-    if (!payload || payload.ok !== true || payload.service !== 'osu-hub-api' || typeof payload.configured !== 'boolean') {
-      throw new Error('Workerのhealth応答形式が正しくありません。');
+    if (!payload || payload.ok !== true || payload.service !== 'osu-hub-sync' || payload.provider !== 'supabase-edge-function' || typeof payload.configured !== 'boolean') {
+      throw new Error('Supabase Sync APIのhealth応答形式が正しくありません。');
     }
     if (payload.configured !== true) {
-      throw new Error('Workerのosu!同期Tokenが設定されていません。自動更新Workflowの状態を確認してください。');
+      throw new Error('osu!同期Tokenが未設定または期限切れです。自動更新Workflowの状態を確認してください。');
     }
-    if (payload.upstreamMode !== 'api-v2-preissued-token' || payload.browserOAuthRequired !== false || payload.tokenManagedBy !== 'github-actions') {
-      throw new Error('Workerが現行のAPI v2同期方式ではありません。デプロイ反映後に再試行してください。');
+    if (payload.browserOAuthRequired !== false) {
+      throw new Error('Sync APIがブラウザSecret不要の構成になっていません。');
     }
     return payload;
   }
@@ -192,13 +198,13 @@
   }
 
   function validateSyncPayload(payload) {
-    if (!payload || typeof payload !== 'object' || !Array.isArray(payload.scores) || !payload.user || typeof payload.user !== 'object') {
-      throw new Error('Workerの同期応答形式が正しくありません。');
+    if (!payload || typeof payload !== 'object' || payload.provider !== 'supabase-edge-function' || !Array.isArray(payload.scores) || !payload.user || typeof payload.user !== 'object') {
+      throw new Error('Supabase Sync APIの同期応答形式が正しくありません。');
     }
-    if (payload.scores.length > 100) throw new Error('Workerから上限を超えるスコアが返されました。');
+    if (payload.scores.length > 100) throw new Error('Sync APIから上限を超えるスコアが返されました。');
     const userId = Number(payload.user.id);
     if (!Number.isFinite(userId) || userId <= 0 || !String(payload.user.username || '').trim()) {
-      throw new Error('Workerのユーザー情報が正しくありません。');
+      throw new Error('Sync APIのユーザー情報が正しくありません。');
     }
     return {
       apiVersion: Number(payload.apiVersion || 0),
@@ -283,13 +289,13 @@
   }
 
   async function testConnection() {
-    const button = $('#testWorker');
+    const button = $('#testService');
     button.disabled = true;
     try {
       const settings = await saveSettings();
-      setStatus('Cloudflare Workerへ接続しています…');
-      validateHealth(await workerFetch(settings, '/health'));
-      setStatus('Worker接続OK。osu! API v2の同期Tokenを利用できます。', 'success');
+      setStatus('Supabase Sync APIへ接続しています…');
+      validateHealth(await serviceFetch(settings, { action: 'health' }));
+      setStatus('接続OK。osu! API v2の同期Tokenを利用できます。', 'success');
       toast('接続確認に成功しました。');
     } catch (error) {
       setStatus(error.message || '接続確認に失敗しました。', 'notice');
@@ -306,13 +312,13 @@
       const settings = await saveSettings();
       if (!settings.user) throw new Error('osu! User IDまたはユーザー名を入力してください。');
       setStatus('osu!から最近のプレイを取得しています…');
-      const params = new URLSearchParams({
+      const payload = validateSyncPayload(await serviceFetch(settings, {
+        action: 'sync',
         user: settings.user,
         mode: settings.mode,
-        limit: String(settings.limit),
-        include_fails: settings.includeFails ? '1' : '0',
-      });
-      const payload = validateSyncPayload(await workerFetch(settings, `/api/sync?${params}`));
+        limit: settings.limit,
+        includeFails: settings.includeFails,
+      }));
       const counts = await importScores(payload);
       const saved = await saveSettings({
         resolvedUserId: payload.user.id,
@@ -339,7 +345,7 @@
 
   async function init() {
     const settings = await getSettings();
-    $('#workerUrl').value = settings.workerUrl;
+    $('#endpointUrl').value = settings.endpointUrl;
     $('#osuUser').value = settings.user;
     $('#osuMode').value = settings.mode;
     $('#syncLimit').value = settings.limit;
@@ -356,7 +362,7 @@
         toast(error.message || '設定の保存に失敗しました。', true);
       }
     });
-    $('#testWorker').addEventListener('click', testConnection);
+    $('#testService').addEventListener('click', testConnection);
     $('#syncNow').addEventListener('click', syncNow);
 
     $$('.nav a').forEach((a) => {
