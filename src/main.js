@@ -4,6 +4,7 @@ const fs = require("fs");
 const { spawn, exec } = require("child_process");
 const https = require("https");
 const http = require("http");
+const { matchText, isSvclEndpointDevice, chooseSvclDevice } = require("./audio-matcher");
 
 const APP_ROOT = path.join(__dirname, "..");
 const DEFAULT_CONFIG_PATH = path.join(APP_ROOT, "data", "config.json");
@@ -289,21 +290,7 @@ function parseSvcl(csv) {
   return lines.slice(1).map((line) => {
     const cols = parseCsvLine(line);
     return { name: get(cols, idx.name), id: get(cols, idx.id), itemId: get(cols, idx.itemId), direction: get(cols, idx.direction), type: get(cols, idx.type), state: get(cols, idx.state), def: get(cols, idx.def), multi: get(cols, idx.multi), comm: get(cols, idx.comm) };
-  }).filter((item) => {
-    const text = [item.name, item.id, item.itemId, item.direction, item.type].join(" ").toLowerCase();
-    const render = /render|speaker|headphone|earphone|スピーカー|ヘッドホン|イヤホン|再生/.test(text);
-    const capture = /capture|microphone|マイク|録音/.test(text);
-    return render && !capture && (item.name || item.id || item.itemId);
-  });
-}
-function matchText(v) { return String(v || "").toLowerCase().replace(/[（）()\[\]{}\\/]/g, " ").replace(/\s+/g, " ").trim(); }
-function scoreItem(item, target) {
-  const n = matchText(target), name = matchText(item.name), id = matchText(item.id), itemId = matchText(item.itemId);
-  if (!n) return 0;
-  if (id === n) return 120; if (itemId === n) return 115; if (name === n) return 110;
-  if (id.includes(n) || itemId.includes(n)) return 90; if (name.includes(n)) return 80;
-  const tokens = n.split(" ").filter((v) => v.length >= 2 && !["device", "render", "audio", "high", "definition"].includes(v));
-  return tokens.length && tokens.every((v) => `${name} ${id} ${itemId}`.includes(v)) ? 60 : 0;
+  }).filter(isSvclEndpointDevice);
 }
 function isYes(v) { return /^(yes|true|1|y|はい|default)$/i.test(String(v || "").trim()); }
 function cleanSvclValue(v) { return String(v || "").replace(/^\uFEFF/, "").trim(); }
@@ -371,42 +358,54 @@ function switchPowerShell(audio) {
   return runProcess("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script, "-DeviceName", String(audio?.deviceName || "")]).then((r) => ({ ...r, message: r.ok ? "Windows標準Fallbackで既定デバイスまで確認しました。" : `Windows標準Fallback失敗: ${r.message}` }));
 }
 
+function formatSvclCandidates(items) {
+  return (Array.isArray(items) ? items : []).slice(0, 15).map((item, i) => `${i + 1}. Name: ${item.name || "(no name)"} | ID: ${item.id || item.itemId || "(no id)"} | State: ${item.state || ""}`).join("\n");
+}
+
 async function switchSvcl(audio) {
   const target = String(audio?.deviceName || "").trim();
   if (!target) return { ok: false, message: "音声デバイス名が未設定です。" };
   const before = await svclList(audio);
   if (!before.ok) return { ok: false, skipped: !before.exe, message: before.exe ? before.message : "SVCL未設定のため音声切替をスキップしました。『SVCLを自動取得』を押してください。", stdout: before.stdout, stderr: before.stderr };
-  const ranked = before.items.map((item) => ({ item, score: scoreItem(item, target) })).sort((a, b) => b.score - a.score);
-  const best = ranked[0];
-  const candidates = before.items.slice(0, 15).map((item, i) => `${i + 1}. Name: ${item.name} | ID: ${item.id || item.itemId}`).join("\n");
-  if (!best || best.score <= 0) return { ok: false, message: "入力名に一致する再生デバイスが見つからないため切替を中止しました。音声デバイス一覧のNameまたはIDをコピーしてください。", stdout: candidates };
-  const targetValue = best.item.id || best.item.itemId || best.item.name;
+
+  const selection = chooseSvclDevice(before.items, target);
+  if (!selection.ok) {
+    const candidates = formatSvclCandidates(selection.ranked?.map((entry) => entry.item) || before.items);
+    if (selection.reason === "ambiguous") {
+      return { ok: false, message: "複数の再生デバイスが同じ強さで一致したため、安全のため切替を中止しました。音声デバイス一覧から完全なIDをコピーしてください。", stdout: candidates };
+    }
+    return { ok: false, message: "入力名に一致する再生デバイスが見つからないため切替を中止しました。音声デバイス一覧のNameまたはIDをコピーしてください。", stdout: candidates };
+  }
+
+  const best = selection.item;
+  const targetValue = best.id || best.itemId || best.name;
   const set = await runProcess(before.exe, ["/Stdout", "/SetDefault", targetValue, "all"]);
-  if (!set.ok || /no items found/i.test(`${set.stdout}\n${set.stderr}`)) return { ok: false, message: "SVCLのSetDefaultで対象に反映されませんでした。", stdout: `matched: ${best.item.name} | ${targetValue}\n${set.stdout || ""}`, stderr: set.stderr || "" };
+  if (!set.ok || /no items found/i.test(`${set.stdout}\n${set.stderr}`)) return { ok: false, message: "SVCLのSetDefaultで対象に反映されませんでした。", stdout: `matched: ${best.name} | ${targetValue}\n${set.stdout || ""}`, stderr: set.stderr || "" };
 
   await sleep(300);
-  const directVerify = await verifySvclDefaultAliases(before.exe, best.item);
+  const directVerify = await verifySvclDefaultAliases(before.exe, best);
   if (directVerify.ok) {
-    return { ok: true, message: `音声出力を切り替えました: ${best.item.name}`, stdout: `verified by Windows default aliases\n${directVerify.details}\nmatched: ${best.item.name} | ${targetValue}` };
+    return { ok: true, message: `音声出力を切り替えました: ${best.name}`, stdout: `verified by Windows default aliases\n${directVerify.details}\nmatched: ${best.name} | ${targetValue}` };
   }
 
   const after = await svclList(audio);
-  const matchedAfter = after.items?.map((item) => ({ item, score: scoreItem(item, targetValue) })).sort((a, b) => b.score - a.score)[0]?.item;
+  const afterSelection = chooseSvclDevice(after.items || [], targetValue);
+  const matchedAfter = afterSelection.ok ? afterSelection.item : null;
   const csvVerified = matchedAfter && [matchedAfter.def, matchedAfter.multi, matchedAfter.comm].some(isYes);
   if (csvVerified) {
-    return { ok: true, message: `音声出力を切り替えました: ${best.item.name}`, stdout: `verified by SVCL CSV fallback\n${directVerify.details}\nmatched: ${best.item.name} | ${targetValue}` };
+    return { ok: true, message: `音声出力を切り替えました: ${best.name}`, stdout: `verified by SVCL CSV fallback\n${directVerify.details}\nmatched: ${best.name} | ${targetValue}` };
   }
 
-  const fallback = await switchPowerShell({ ...audio, deviceName: best.item.name || target });
+  const fallback = await switchPowerShell({ ...audio, deviceName: best.name || target });
   if (fallback.ok) {
-    return { ok: true, message: `音声出力を切り替えました: ${best.item.name}（Windows標準Fallbackで確認）`, stdout: `SVCL command matched: ${best.item.name} | ${targetValue}\n${directVerify.details}\n${fallback.stdout || ""}` };
+    return { ok: true, message: `音声出力を切り替えました: ${best.name}（Windows標準Fallbackで確認）`, stdout: `SVCL command matched: ${best.name} | ${targetValue}\n${directVerify.details}\n${fallback.stdout || ""}` };
   }
 
   return {
     ok: false,
     verifyNeeded: true,
-    message: `音声切替コマンドは実行しましたが、Windows側の既定デバイスを確認できませんでした: ${best.item.name}`,
-    stdout: `matched: ${best.item.name} | ${targetValue}\n${set.stdout || ""}\n${directVerify.details}\nFallback: ${fallback.message}`,
+    message: `音声切替コマンドは実行しましたが、Windows側の既定デバイスを確認できませんでした: ${best.name}`,
+    stdout: `matched: ${best.name} | ${targetValue}\n${set.stdout || ""}\n${directVerify.details}\nFallback: ${fallback.message}`,
     stderr: fallback.stderr || ""
   };
 }
@@ -503,10 +502,10 @@ ipcMain.handle("audio:list", async (_e, audio) => {
   const svcl = await svclList(audio || {});
   const logs = [];
   if (svcl.ok) {
-    logs.push({ type: "success", text: "SVCL側の再生デバイス一覧:" });
+    logs.push({ type: "success", text: "SVCL側の再生デバイス一覧（アプリ音声セッションは除外）:" });
     if (svcl.savedPath) logs.push({ type: "info", text: `一覧CSV保存先: ${svcl.savedPath}` });
     svcl.items.forEach((item) => logs.push({ type: [item.def, item.multi, item.comm].some(isYes) ? "success" : "info", text: `${item.name || "(no name)"} | ID: ${item.id || item.itemId || "(no id)"} | State: ${item.state || ""}` }));
-    if (!svcl.items.length) logs.push({ type: "error", text: "再生デバイスを抽出できませんでした。CSVログを確認してください。" });
+    if (!svcl.items.length) logs.push({ type: "error", text: "再生デバイスEndpointを抽出できませんでした。CSVログを確認してください。" });
   } else logs.push({ type: "error", text: svcl.message });
   const nir = resolveTool(audio?.nircmdPath, ["nircmdc.exe", "nircmd.exe"]);
   if (nir) {
