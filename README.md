@@ -144,7 +144,7 @@ Importは `parse → validation → recovery snapshot → transaction write → 
 現在の配布版:
 
 ```text
-osu Setup Launcher v0.18.0
+osu Setup Launcher v0.18.1
 https://github.com/EliteMay/osu-hub/releases/latest
 ```
 
@@ -155,7 +155,7 @@ https://github.com/EliteMay/osu-hub/releases/latest
 - REAL等の遅延対策アプリ起動
 - osu!lazer自動検出 / 起動
 
-### 音声切替 v0.18.0
+### 音声切替 v0.18.1
 
 既定はSoundVolumeCommandLine (`svcl.exe`) を使用します。
 
@@ -164,11 +164,12 @@ https://github.com/EliteMay/osu-hub/releases/latest
 → SVCL /SetDefault <target> all
 → DefaultRenderDevice / Multi / Comm を直接参照して確認
 → 旧CSV Default列Fallback
-→ Windows PolicyConfig Fallback
+→ Fallback ScriptでSVCL /GetColumnValueを再確認
+→ 必要な場合のみWindows Core Audio / PolicyConfig
 → Multimedia default device IDを再取得して確認
 ```
 
-v0.17.0で、SVCLの対象照合とコマンド実行は成功しているのにCSV Default列だけで確認できず偽エラーになる実機ケースが確認されたため、v0.18.0で確認経路を強化しました。
+v0.18.0実機ログでは、SVCLの対象照合とコマンド実行後にWindows標準Fallbackへ入り、Core Audioの `IMMDeviceCollection` を誤ったIIDで宣言していたため `E_NOINTERFACE (0x80004002)` になっていました。v0.18.1でWindows SDKと一致するIIDへ修正し、Fallbackの先頭でもSVCLの既定出力を公式の `/GetColumnValue` 形式で再確認します。
 
 既存のuserData設定、FxSound等の音声デバイス名、OpenTabletDriver / REAL / osu! pathは更新時に維持する構成です。
 
@@ -179,6 +180,7 @@ v0.17.0で、SVCLの対象照合とコマンド実行は成功しているのに
 PR:
 
 - `node --check` でElectron JavaScript構文確認
+- Audio COM IID / fallback static regression check
 - installer build
 - Setup.exe存在・最低サイズ確認
 - Actions Artifact保存
@@ -210,6 +212,8 @@ Pages ArtifactはWebファイルだけを公開し、Electron source、bat、Sup
 
 `tests/validate-web.mjs` ではVersion、Project Profile、Secret混入、Import Recovery、Supabase endpoint、Recent / Best、自動蓄積、Token更新Workflow、Windows Release導線、旧Cloudflare Runtime再混入などを検査します。
 
+`tests/validate-audio-interop.mjs` ではCore Audio COM IIDとFallback検証経路の再発防止を行います。
+
 ## 崩してはいけない仕様
 
 - Secretを公開コードへ入れない
@@ -232,7 +236,7 @@ Pages ArtifactはWebファイルだけを公開し、Electron source、bat、Sup
 - Backup / Import / Rollback実ブラウザE2E
 - Recent 24時間より前を含む全履歴ページング同期
 - 同期済みResultsをAI Coachingへ直接選択する機能
-- Windows実機でv0.18.0のFxSound音声切替再確認
+- Windows実機でv0.18.1のFxSound音声切替再確認
 - update install後のuserData維持確認
 - Root Electronの `package-lock.json` は次回dependency導入・更新時に実package managerで生成する
 

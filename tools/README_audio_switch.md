@@ -1,6 +1,6 @@
 # 音声切替ツールについて
 
-v17では **SoundVolumeCommandLine（SVCL）モード** を推奨します。
+v0.18.1では **SoundVolumeCommandLine（SVCL）モード** を推奨します。
 
 ## 推奨: SVCLモード
 
@@ -17,15 +17,25 @@ v17では **SoundVolumeCommandLine（SVCL）モード** を推奨します。
 High Definition Audio Device\Device\Speakers\Render
 ```
 
-v17では、入力した名前が一覧に存在することを確認してから切替を実行し、切替後も既定デバイス状態を再取得して確認します。
+切替時は、入力した名前が一覧に存在することを確認してから `/SetDefault <target> all` を実行し、切替後も既定デバイス状態を再取得して確認します。
+
+v0.18.1ではmain側で確認できなかった場合、Fallback scriptがSVCLへ `/GetColumnValue DefaultRenderDevice*` を直接実行して既定出力を再確認します。それでも確認できない場合だけWindows Core Audio / PolicyConfigへ進みます。
+
+## Windows Core Audio Fallback
+
+`tools/AudioSwitcher.cs` を使う予備経路です。
+
+v0.18.0では `IMMDeviceCollection` のIID転記ミスにより `E_NOINTERFACE (0x80004002)` が発生していました。v0.18.1でWindows SDKと一致する次のIIDへ修正済みです。
+
+```txt
+0BD7A1BE-7A1A-44DB-8397-CC5392387B5E
+```
+
+Windows固有処理のため、CI成功だけでは実機成功扱いにしません。
 
 ## 予備: NirCmdモード
 
 NirCmdは一部環境で終了コードが成功でも目的デバイスへ切り替わらないことがあったため、予備として残しています。
-
-## 標準モード
-
-Windows COM APIを使う旧方式です。環境によって `E_NOINTERFACE` などのCOMエラーが出るため、通常はSVCLモードを使ってください。
 
 ## 手動テスト
 

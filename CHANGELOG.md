@@ -2,6 +2,40 @@
 
 Web Versionの正本は `data/site.json` の `siteVersion` です。Desktop Launcher Versionの正本は `package.json` の `version` です。
 
+## Web 0.2.10 - 2026-08-31
+
+### Changed
+
+- Desktop Toolsの配布表示をSetup Launcher `v0.18.1` へ更新
+- FxSound環境で確認された `E_NOINTERFACE` 修正内容とSVCL / Core Audio Fallback順序を表示
+
+### Verification
+
+- PRでWeb validation / Windows installer build / audio interop regression guardを確認する
+- 実WindowsのFxSound切替はv0.18.1 install後に再確認する
+
+## Desktop 0.18.1 - 2026-08-31
+
+### Fixed
+
+- Windows Core Audio `IMMDeviceCollection` IIDの転記ミスを修正
+  - 誤: `0BD7A1BE-7A1A-44DB-8397-C0A53CAD458F`
+  - 正: `0BD7A1BE-7A1A-44DB-8397-CC5392387B5E`
+- v0.18.0実機で発生した `0x80004002 (E_NOINTERFACE)` の直接原因を解消
+- Windows Core Audioへ入る前にFallback scriptがSVCLの `DefaultRenderDevice` / `DefaultRenderDeviceMulti` / `DefaultRenderDeviceComm` を公式の `/GetColumnValue` 形式で再確認するよう変更
+
+### Regression Guard
+
+- `tests/validate-audio-interop.mjs` を追加
+- 正しい `IMMDeviceCollection` IIDを必須化し、誤ったIIDの再混入を失敗扱い
+- Windows installer workflowでaudio interop validatorをbuild前に実行
+
+### Compatibility
+
+- `configVersion` は17のまま
+- Electron userData保存方式変更なし
+- 既存のFxSound等の音声デバイス名、OpenTabletDriver / REAL / osu! pathを維持
+
 ## Web 0.2.9 - 2026-08-31
 
 ### Changed
