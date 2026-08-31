@@ -19,6 +19,7 @@ on:
       - "作業報告書.md"
       - "supabase/functions/**"
       - "tests/**"
+      - ".github/dependabot.yml"
       - ".github/workflows/check-web.yml"
       - ".github/workflows/refresh-osu-token.yml"
   pull_request:
@@ -39,6 +40,7 @@ on:
       - "作業報告書.md"
       - "supabase/functions/**"
       - "tests/**"
+      - ".github/dependabot.yml"
       - ".github/workflows/check-web.yml"
       - ".github/workflows/refresh-osu-token.yml"
   workflow_dispatch:
