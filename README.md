@@ -128,6 +128,8 @@ CORSはGitHub Pages originとlocalhost開発だけを許可します。
 5. `health`を確認
 6. 公開User ID 2でRecent Scores 1件のend-to-end smoke test
 
+Web 0.2.6のmain反映後に、Token更新・`health configured=true`・Recent Scores smokeまで成功確認済みです。
+
 ### Cloudflareについて
 
 Cloudflare Worker方式は本番でosu!側429を継続再現したため、Account Syncの現行Runtimeから削除しました。経緯はCHANGELOGとGit履歴に残しています。
@@ -194,9 +196,18 @@ Pages ArtifactはWebファイルだけを公開します。Supabase function sou
 - Electron Launcherを削除しない
 - 外部Responseが想定形式でない場合に不正データを保存しない
 
+## 確認済み
+
+- Supabase project / Token Store migration / Edge Function deploy
+- PR #9 `Check web`
+- merge後main `Check web`
+- GitHub Pages deploy
+- `Refresh osu API Token` Workflow
+- Supabase `health configured=true`
+- Supabase → osu! API v2 Recent Scores end-to-end smoke
+
 ## 未確認 / 今後
 
-- Supabase移行後のGitHub Actions Token refresh E2E
 - ユーザー自身の実ブラウザAccount Sync → Results → Stats E2E
 - Backup / Import / Rollbackの実ブラウザE2E
 - Recent Scoresの過去全履歴ページング同期
