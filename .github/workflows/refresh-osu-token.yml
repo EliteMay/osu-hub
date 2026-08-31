@@ -9,6 +9,7 @@ on:
       - main
     paths:
       - ".github/workflows/refresh-osu-token.yml"
+      - "data/site.json"
 
 permissions:
   contents: read
@@ -19,9 +20,9 @@ concurrency:
 
 jobs:
   refresh:
-    name: Refresh pre-issued token
+    name: Refresh Supabase osu token
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
@@ -30,170 +31,120 @@ jobs:
       - name: Validate required secrets
         shell: bash
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           OSU_CLIENT_ID: ${{ secrets.OSU_CLIENT_ID }}
           OSU_CLIENT_SECRET: ${{ secrets.OSU_CLIENT_SECRET }}
         run: |
           set -euo pipefail
-          missing=0
-          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID OSU_CLIENT_ID OSU_CLIENT_SECRET; do
+          for name in OSU_CLIENT_ID OSU_CLIENT_SECRET; do
             if [ -z "${!name:-}" ]; then
               echo "::error::Missing repository secret: ${name}"
-              missing=1
+              exit 1
             fi
           done
-          if [ "$missing" -ne 0 ]; then
-            exit 1
-          fi
 
-      - name: Request osu client-credentials token outside Cloudflare
+      - name: Resolve Supabase Sync API endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          endpoint="$(node -e '
+            const fs = require("fs");
+            const site = JSON.parse(fs.readFileSync("data/site.json", "utf8"));
+            const value = String(site?.osuApi?.endpointUrl || "");
+            if (!/^https:\/\/[^/]+\.supabase\.co\/functions\/v1\/osu-sync$/.test(value)) process.exit(2);
+            process.stdout.write(value);
+          ')"
+          printf 'SYNC_ENDPOINT=%s\n' "$endpoint" >> "$GITHUB_ENV"
+          echo "Sync endpoint resolved from data/site.json."
+
+      - name: Refresh token in Supabase
         shell: bash
         env:
           OSU_CLIENT_ID: ${{ secrets.OSU_CLIENT_ID }}
           OSU_CLIENT_SECRET: ${{ secrets.OSU_CLIENT_SECRET }}
         run: |
           set -euo pipefail
-          body_file="$(mktemp)"
-          header_file="$(mktemp)"
-          trap 'rm -f "$body_file" "$header_file"' EXIT
+          request_file="$(mktemp)"
+          response_file="$(mktemp)"
+          trap 'rm -f "$request_file" "$response_file"' EXIT
+
+          node -e '
+            const fs = require("fs");
+            fs.writeFileSync(process.argv[1], JSON.stringify({
+              action: "refresh",
+              clientId: process.env.OSU_CLIENT_ID,
+              clientSecret: process.env.OSU_CLIENT_SECRET,
+            }));
+          ' "$request_file"
 
           status="$(curl --silent --show-error \
-            --output "$body_file" \
-            --dump-header "$header_file" \
-            --write-out '%{http_code}' \
-            --request POST 'https://osu.ppy.sh/oauth/token' \
-            --header 'Accept: application/json' \
-            --header 'Content-Type: application/x-www-form-urlencoded' \
-            --data-urlencode "client_id=${OSU_CLIENT_ID}" \
-            --data-urlencode "client_secret=${OSU_CLIENT_SECRET}" \
-            --data-urlencode 'grant_type=client_credentials' \
-            --data-urlencode 'scope=public')"
-
-          if [ "$status" != "200" ]; then
-            retry_after="$(awk 'BEGIN{IGNORECASE=1} /^retry-after:/ {gsub("\r", "", $2); print $2; exit}' "$header_file")"
-            if [ -n "$retry_after" ]; then
-              echo "::error::osu! token request failed (HTTP ${status}, Retry-After: ${retry_after}s)."
-            else
-              echo "::error::osu! token request failed (HTTP ${status})."
-            fi
-            exit 1
-          fi
-
-          token="$(node -e '
-            const fs = require("fs");
-            const value = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-            if (value?.token_type !== "Bearer" || typeof value?.access_token !== "string" || value.access_token.length < 20) process.exit(2);
-            process.stdout.write(value.access_token);
-          ' "$body_file")"
-          expires_in="$(node -e '
-            const fs = require("fs");
-            const value = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-            const seconds = Number(value?.expires_in);
-            if (!Number.isFinite(seconds) || seconds < 3600) process.exit(2);
-            process.stdout.write(String(Math.trunc(seconds)));
-          ' "$body_file")"
-
-          echo "::add-mask::${token}"
-          printf 'OSU_ACCESS_TOKEN=%s\n' "$token" >> "$GITHUB_ENV"
-          printf 'OSU_TOKEN_EXPIRES_IN=%s\n' "$expires_in" >> "$GITHUB_ENV"
-          echo "osu! client-credentials token issued successfully (${expires_in}s lifetime)."
-
-      - name: Verify token against osu API v2
-        shell: bash
-        run: |
-          set -euo pipefail
-          body_file="$(mktemp)"
-          trap 'rm -f "$body_file"' EXIT
-
-          status="$(curl --silent --show-error \
-            --output "$body_file" \
+            --output "$response_file" \
             --write-out '%{http_code}' \
             --connect-timeout 10 --max-time 30 \
-            'https://osu.ppy.sh/api/v2/users/2/osu' \
+            --request POST "$SYNC_ENDPOINT" \
             --header 'Accept: application/json' \
-            --header "Authorization: Bearer ${OSU_ACCESS_TOKEN}")"
+            --header 'Content-Type: application/json' \
+            --data-binary "@$request_file")"
 
           if [ "$status" != "200" ]; then
-            echo "::error::Pre-issued token API verification failed (HTTP ${status})."
+            echo "::error::Supabase token refresh failed (HTTP ${status})."
+            cat "$response_file"
             exit 1
           fi
 
           node -e '
             const fs = require("fs");
             const value = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-            if (Number(value?.id) !== 2 || !String(value?.username || "").trim()) throw new Error("Unexpected Get User response");
-            console.log("osu! API v2 token verification: OK");
-          ' "$body_file"
+            if (value?.ok !== true || value?.tokenStored !== true || !value?.expiresAt) throw new Error("Unexpected refresh response");
+            console.log(`Supabase token refresh: OK (expires ${value.expiresAt})`);
+          ' "$response_file"
 
-      - name: Store token as Cloudflare Worker secret
-        id: deploy
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: cloudflare/worker
-          wranglerVersion: "4.127.1"
-          secrets: |
-            OSU_ACCESS_TOKEN
-          command: deploy
-
-      - name: Verify Worker after token refresh
+      - name: Verify Supabase health and osu sync
         shell: bash
-        env:
-          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
         run: |
           set -euo pipefail
-          if [ -z "${DEPLOYMENT_URL:-}" ]; then
-            echo "::error::Wrangler did not return a deployment URL."
-            exit 1
-          fi
-
-          base_url="${DEPLOYMENT_URL%/}"
           health="$(curl --fail --silent --show-error \
-            --retry 4 --retry-delay 2 --retry-all-errors \
             --connect-timeout 10 --max-time 30 \
-            "${base_url}/health")"
+            --request POST "$SYNC_ENDPOINT" \
+            --header 'Accept: application/json' \
+            --header 'Content-Type: application/json' \
+            --data '{"action":"health"}')"
 
           printf '%s' "$health" | node -e '
             const fs = require("fs");
             const value = JSON.parse(fs.readFileSync(0, "utf8"));
-            if (value?.ok !== true || value?.configured !== true) throw new Error("Worker health is not ready after token refresh");
-            if (value?.upstreamMode !== "api-v2-preissued-token") throw new Error("Unexpected Worker upstream mode");
+            if (value?.ok !== true || value?.configured !== true) throw new Error("Supabase sync health is not ready");
+            if (value?.service !== "osu-hub-sync" || value?.provider !== "supabase-edge-function") throw new Error("Unexpected sync provider");
             if (value?.browserOAuthRequired !== false) throw new Error("Browser OAuth credentials must not be required");
-            if (value?.tokenManagedBy !== "github-actions") throw new Error("Unexpected token management mode");
-            console.log("Worker health after token refresh: OK");
+            console.log("Supabase sync health: OK");
           '
 
           sync="$(curl --fail --silent --show-error \
-            --retry 2 --retry-delay 2 --retry-all-errors \
             --connect-timeout 10 --max-time 30 \
-            "${base_url}/api/sync?user=2&mode=osu&limit=1&include_fails=1")"
+            --request POST "$SYNC_ENDPOINT" \
+            --header 'Accept: application/json' \
+            --header 'Content-Type: application/json' \
+            --data '{"action":"sync","user":"2","mode":"osu","limit":1,"includeFails":true}')"
 
           printf '%s' "$sync" | node -e '
             const fs = require("fs");
             const value = JSON.parse(fs.readFileSync(0, "utf8"));
-            if (value?.apiVersion !== 1 || value?.upstreamMode !== "api-v2-preissued-token") throw new Error("Unexpected sync response after token refresh");
-            if (!value?.user || Number(value.user.id) !== 2) throw new Error("Get User smoke test failed after token refresh");
-            if (!Array.isArray(value.scores) || value.scores.length > 1) throw new Error("Recent Scores smoke test failed after token refresh");
-            console.log(`Worker sync after token refresh: OK (${value.scores.length} recent score(s))`);
+            if (value?.apiVersion !== 1 || value?.provider !== "supabase-edge-function") throw new Error("Unexpected sync response");
+            if (!value?.user || Number(value.user.id) !== 2) throw new Error("Get User smoke test failed");
+            if (!Array.isArray(value.scores) || value.scores.length > 1) throw new Error("Recent Scores smoke test failed");
+            console.log(`Supabase account-sync smoke test: OK (${value.scores.length} recent score(s))`);
           '
 
       - name: Record refresh result
         shell: bash
-        env:
-          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
         run: |
-          set -euo pipefail
           {
             echo "## osu! API token refresh"
             echo
-            echo "- Token source: GitHub Actions runner"
-            echo "- Lifetime reported by osu!: ${OSU_TOKEN_EXPIRES_IN}s"
-            echo "- Stored in Worker secret: OSU_ACCESS_TOKEN"
-            echo "- Client Secret stored in Worker: no"
-            echo "- Worker redeployed: ${DEPLOYMENT_URL}"
-            echo "- /health after refresh: OK"
-            echo "- /api/sync after refresh: OK"
+            echo "- Provider: Supabase Edge Function"
+            echo "- Client ID / Secret source: GitHub Actions Secrets"
+            echo "- Client Secret stored in Supabase: no"
+            echo "- Access Token stored in RLS-protected table: yes"
+            echo "- /health: OK"
+            echo "- Account Sync smoke: OK"
             echo "- Trigger: ${GITHUB_EVENT_NAME}"
           } >> "$GITHUB_STEP_SUMMARY"
