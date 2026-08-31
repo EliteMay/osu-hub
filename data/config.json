@@ -11,7 +11,7 @@
     "scriptPath": "tools\\switch_audio_device.ps1",
     "customCommand": "",
     "command": "",
-    "memo": "v18ではSVCLで切替後、DefaultRenderDevice系エイリアスからWindows既定出力を直接確認する。確認できない場合はPolicyConfigのWindows標準Fallbackで切替・再確認する。",
+    "memo": "v0.18.3ではSVCL名とWindows Core AudioのFriendly Nameの語順が違ってもToken照合してFallback対象を特定する。",
     "helperPath": "tools\\AudioSwitcher.cs",
     "soundVolumeViewPath": "",
     "nircmdPath": "tools\\nircmdc.exe",
@@ -63,5 +63,5 @@
     "memo": "v0.18.2以降はGitHub Releasesのelectron-updater用Metadataで起動時に自動確認します。versionUrlは旧版互換用として残します。",
     "lastDownloadUrl": ""
   },
-  "appVersion": "0.18.2"
+  "appVersion": "0.18.3"
 }
