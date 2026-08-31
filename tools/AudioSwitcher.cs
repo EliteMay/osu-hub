@@ -158,6 +158,11 @@ namespace OsuSetupAudio
         public string Id { get; set; }
         public string Name { get; set; }
         public bool IsDefault { get; set; }
+        public DeviceState State { get; set; }
+        public bool IsActive
+        {
+            get { return (State & DeviceState.Active) == DeviceState.Active; }
+        }
     }
 
     public class AudioSwitcher
@@ -212,13 +217,44 @@ namespace OsuSetupAudio
             }
         }
 
-        public static List<DeviceInfo> GetRenderDevices()
+        private static string GetDefaultRenderDeviceId(IMMDeviceEnumerator enumerator)
+        {
+            IMMDevice defaultDevice = null;
+            try
+            {
+                int hr = enumerator.GetDefaultAudioEndpoint(EDataFlow.eRender, ERole.eMultimedia, out defaultDevice);
+                if (hr >= 0 && defaultDevice != null) return GetDeviceId(defaultDevice);
+                return "";
+            }
+            finally
+            {
+                if (defaultDevice != null) Marshal.ReleaseComObject(defaultDevice);
+            }
+        }
+
+        private static DeviceInfo BuildDeviceInfo(IMMDevice device, string defaultId)
+        {
+            if (device == null) return null;
+            string id = GetDeviceId(device);
+            string name = GetDeviceName(device);
+            DeviceState state = 0;
+            try { device.GetState(out state); } catch { }
+            if (String.IsNullOrWhiteSpace(id)) return null;
+
+            return new DeviceInfo()
+            {
+                Id = id,
+                Name = name,
+                State = state,
+                IsDefault = String.Equals(id, defaultId, StringComparison.OrdinalIgnoreCase)
+            };
+        }
+
+        private static List<DeviceInfo> GetRenderDevicesByState(DeviceState stateMask)
         {
             var list = new List<DeviceInfo>();
             IMMDeviceEnumerator enumerator = null;
             IMMDeviceCollection collection = null;
-            IMMDevice defaultDevice = null;
-            string defaultId = "";
 
             try
             {
@@ -226,13 +262,8 @@ namespace OsuSetupAudio
                 enumerator = rawEnumerator as IMMDeviceEnumerator;
                 if (enumerator == null) throw new InvalidOperationException("MMDeviceEnumerator cast failed.");
 
-                int hrDefault = enumerator.GetDefaultAudioEndpoint(EDataFlow.eRender, ERole.eMultimedia, out defaultDevice);
-                if (hrDefault >= 0 && defaultDevice != null)
-                {
-                    defaultId = GetDeviceId(defaultDevice);
-                }
-
-                int hr = enumerator.EnumAudioEndpoints(EDataFlow.eRender, (uint)DeviceState.Active, out collection);
+                string defaultId = GetDefaultRenderDeviceId(enumerator);
+                int hr = enumerator.EnumAudioEndpoints(EDataFlow.eRender, (uint)stateMask, out collection);
                 ThrowIfFailed(hr, "EnumAudioEndpoints");
                 if (collection == null) throw new InvalidOperationException("IMMDeviceCollection is null after EnumAudioEndpoints.");
 
@@ -247,18 +278,8 @@ namespace OsuSetupAudio
                     {
                         hr = collection.Item(i, out device);
                         if (hr < 0 || device == null) continue;
-
-                        string id = GetDeviceId(device);
-                        string name = GetDeviceName(device);
-                        if (!String.IsNullOrWhiteSpace(name) && !String.IsNullOrWhiteSpace(id))
-                        {
-                            list.Add(new DeviceInfo()
-                            {
-                                Id = id,
-                                Name = name,
-                                IsDefault = String.Equals(id, defaultId, StringComparison.OrdinalIgnoreCase)
-                            });
-                        }
+                        DeviceInfo info = BuildDeviceInfo(device, defaultId);
+                        if (info != null && !String.IsNullOrWhiteSpace(info.Name)) list.Add(info);
                     }
                     finally
                     {
@@ -270,8 +291,39 @@ namespace OsuSetupAudio
             }
             finally
             {
-                if (defaultDevice != null) Marshal.ReleaseComObject(defaultDevice);
                 if (collection != null) Marshal.ReleaseComObject(collection);
+                if (enumerator != null) Marshal.ReleaseComObject(enumerator);
+            }
+        }
+
+        public static List<DeviceInfo> GetRenderDevices()
+        {
+            return GetRenderDevicesByState(DeviceState.Active);
+        }
+
+        public static List<DeviceInfo> GetRenderDevicesAll()
+        {
+            return GetRenderDevicesByState(DeviceState.All);
+        }
+
+        public static DeviceInfo GetRenderDeviceById(string id)
+        {
+            if (String.IsNullOrWhiteSpace(id)) return null;
+            IMMDeviceEnumerator enumerator = null;
+            IMMDevice device = null;
+            try
+            {
+                object rawEnumerator = new MMDeviceEnumeratorComObject();
+                enumerator = rawEnumerator as IMMDeviceEnumerator;
+                if (enumerator == null) throw new InvalidOperationException("MMDeviceEnumerator cast failed.");
+
+                int hr = enumerator.GetDevice(id, out device);
+                if (hr < 0 || device == null) return null;
+                return BuildDeviceInfo(device, GetDefaultRenderDeviceId(enumerator));
+            }
+            finally
+            {
+                if (device != null) Marshal.ReleaseComObject(device);
                 if (enumerator != null) Marshal.ReleaseComObject(enumerator);
             }
         }

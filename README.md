@@ -10,7 +10,7 @@ osu!のプレイ記録、アカウント同期、AIコーチング、練習管�
 
 ## Project Guide
 
-`EliteMay/web-project-guide` **Guide Version 1.6.0** を採用しています。
+`EliteMay/web-project-guide` **Guide Version 1.6.0** をProject adoption metadataとして保持しています。実作業時はカスタムルールに従い、毎回 `web-project-guide` の最新版を確認して必要なルールを適用します。
 
 Project Profile:
 
@@ -142,10 +142,9 @@ Importは `parse → validation → recovery snapshot → transaction write → 
 
 ## Desktop Tools
 
-現在の配布版:
+Desktop Versionの正本は `package.json#version`、配布先はGitHub Releases latestです。
 
 ```text
-osu Setup Launcher v0.18.2
 https://github.com/EliteMay/osu-hub/releases/latest
 ```
 
@@ -167,15 +166,26 @@ https://github.com/EliteMay/osu-hub/releases/latest
 → DefaultRenderDevice / Multi / Comm を直接参照して確認
 → 旧CSV Default列Fallback
 → Fallback ScriptでSVCL /GetColumnValueを再確認
+→ FxSound targetならFxSound.exe readiness確認
+→ Core AudioでActive / Disabled / Unplugged / NotPresentを診断
+→ DisabledならSVCL /Enableを試行
+→ Active化待機
 → 必要な場合のみWindows Core Audio / PolicyConfig
 → Multimedia default device IDを再取得して確認
 ```
 
-v0.18.0実機ログでは、SVCLの対象照合とコマンド実行後にWindows標準Fallbackへ入り、Core Audioの `IMMDeviceCollection` を誤ったIIDで宣言していたため `E_NOINTERFACE (0x80004002)` になっていました。v0.18.1でWindows SDKと一致するIIDへ修正し、Fallbackの先頭でもSVCLの既定出力を公式の `/GetColumnValue` 形式で再確認します。
+#### FxSound実機修正履歴
 
-### Auto Update v0.18.2
+- v0.18.1: Core Audio `IMMDeviceCollection` IIDの誤りによる `E_NOINTERFACE` を修正
+- v0.18.3: `FxSound Speakers` と `Speakers (FxSound Audio Enhancer)` の語順差を吸収
+- v0.18.4: speaker / スピーカー等の表示言語依存語を識別Tokenから除外
+- v0.18.5: SVCLには存在するがCore Audio Active一覧に存在しないEndpointをState付きで診断。FxSound process起動、Disabled Endpointの `/Enable`、Active化待機を追加
 
-v0.18.2から`electron-updater` + GitHub Releasesを使ったOne-click Updateへ移行します。
+v0.18.4実Windowsログでは、SVCLが `FxSound Speakers` を見つける一方、Core Audio Active一覧にはFxSoundが存在しませんでした。SVCL一覧はDisabled / Unpluggedも含む設定なのに対し、旧Core Audio FallbackはActiveのみを列挙していたためです。v0.18.5ではこのState差を明示的に扱います。
+
+### Auto Update v0.18.2+
+
+v0.18.2から`electron-updater` + GitHub Releasesを使ったOne-click Updateへ移行しています。
 
 ```text
 Launcher起動
@@ -198,7 +208,7 @@ Launcherを終了してInstall
 重要:
 
 - **v0.18.1以前にはUpdaterが入っていないため、v0.18.2への更新だけはSetup.exeを1回手動実行する必要があります。**
-- v0.18.2を一度導入した後は、将来の新版をアプリ内の「今すぐ更新」から更新できる構成です。
+- v0.18.2を一度導入した後は、以後の新版をアプリ内の「今すぐ更新」から更新できます。
 - 起動時の自動確認は設定からOFFにできます。
 - 更新失敗時は現在Versionを継続利用でき、GitHub Releasesを開くFallbackがあります。
 - 設定はElectron `userData` に保存しているため、Installer更新で上書きしない構成です。
@@ -220,7 +230,10 @@ latest.yml
 PR:
 
 - Electron JavaScript構文確認
-- Audio COM IID / Fallback regression check
+- Audio COM IID / Endpoint state / Fallback regression check
+- PowerShell 5.1 parse
+- `AudioSwitcher.cs` compile
+- FxSound matcher Self Test
 - Auto Update regression check
 - installer build
 - Setup.exe / `latest.yml` / `.blockmap` の存在・Version整合確認
@@ -251,7 +264,7 @@ Pages ArtifactはWebファイルだけを公開し、Electron source、bat、Sup
 
 `tests/validate-web.mjs` ではVersion、Project Profile、Secret混入、Import Recovery、Supabase endpoint、Recent / Best、自動蓄積、Token更新Workflow、Windows Release / Auto Update導線、旧Cloudflare Runtime再混入などを検査します。
 
-`tests/validate-audio-interop.mjs` ではCore Audio COM IIDとFallback検証経路の再発防止を行います。
+`tests/validate-audio-interop.mjs` ではCore Audio COM IID、Endpoint state、FxSound readiness、Fallback検証経路の再発防止を行います。
 
 `tests/validate-auto-update.mjs` ではUpdater bootstrap、GitHub Provider、One-click flow、Release Metadata、manual fallbackを検査します。
 
@@ -278,8 +291,8 @@ Pages ArtifactはWebファイルだけを公開し、Electron source、bat、Sup
 - Backup / Import / Rollback実ブラウザE2E
 - Recent 24時間より前を含む全履歴ページング同期
 - 同期済みResultsをAI Coachingへ直接選択する機能
-- Windows実機でv0.18.1以降のFxSound音声切替再確認
-- v0.18.2 → 将来Versionの実Windows One-click Update / Restart確認
+- Windows実機でv0.18.5のFxSound Endpoint Active化 / 既定出力切替確認
+- v0.18.4 → v0.18.5の実Windows One-click Update / Restart確認
 - Auto Update後のuserData設定維持確認
 - Installer Code Signing
 - Root Electronの `package-lock.json` をdependency変更に合わせて生成・追跡する

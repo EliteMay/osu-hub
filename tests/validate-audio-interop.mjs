@@ -24,23 +24,39 @@ if (audioSwitcher.includes(brokenCollectionIid)) {
 }
 
 for (const marker of [
+  'GetRenderDevicesAll',
+  'GetRenderDeviceById',
+  'DeviceState State',
+  'bool IsActive',
+  'SetDefaultRenderDevice'
+]) {
+  if (!audioSwitcher.includes(marker)) fail(`AudioSwitcher.cs is missing inactive-endpoint marker: ${marker}`);
+}
+
+for (const marker of [
   'DefaultRenderDeviceMulti',
   'DefaultRenderDevice',
   'DefaultRenderDeviceComm',
   '/GetColumnValue',
   'VERIFIED_DEFAULT_SVCL',
-  'GetRenderDevices',
+  'GetRenderDevicesAll',
   'SetDefaultRenderDevice',
   'VERIFIED_DEFAULT',
   'Get-AudioTokens',
   'Get-AudioDeviceMatchScore',
   'Find-BestRenderDeviceMatch',
   'MATCHED_CORE_AUDIO',
+  'MATCHED_CORE_AUDIO_INACTIVE',
   'MATCH_TOKENS',
   'AVAILABLE_DEVICES',
+  'SVCL_TARGET_STATE',
+  'SVCL_ENABLE_ATTEMPT',
+  'FXSOUND_PROCESS',
+  'Ensure-FxSoundProcess',
+  'Target endpoint is not active',
   'AUDIO_MATCH_SELF_TEST_OK',
   'Localized Output (FxSound Audio Enhancer)',
-  'Speakers (Other Audio Enhancer)',
+  'Speakers (FxSound Audio Enhancer)',
   'FxSound Speakers',
   "'speaker', 'speakers'"
 ]) {
@@ -49,6 +65,10 @@ for (const marker of [
 
 if (/&\s+\$svclPath\s+\/Stdout\s+\/GetColumnValue/i.test(fallbackScript)) {
   fail('SVCL /GetColumnValue fallback must use the documented direct command form without /Stdout.');
+}
+
+if (!/\/Enable\s+\$matched\.Id/.test(fallbackScript)) {
+  fail('Inactive disabled endpoints must have an SVCL /Enable recovery attempt.');
 }
 
 if (!windowsWorkflow.includes('switch_audio_device.ps1 -SelfTest')) {
