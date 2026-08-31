@@ -40,7 +40,7 @@ for (const marker of [
   'AVAILABLE_DEVICES',
   'AUDIO_MATCH_SELF_TEST_OK',
   'Localized Output (FxSound Audio Enhancer)',
-  'Speakers (FxSound Audio Enhancer)',
+  'Speakers (Other Audio Enhancer)',
   'FxSound Speakers',
   "'speaker', 'speakers'"
 ]) {
