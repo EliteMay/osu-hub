@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="osu! API v2の公開プロフィールとRecent Scoresを取得してosu! Hubへ保存するAccount Sync設定。">
+  <meta name="description" content="osu! API v2からRecent Plays（直近24時間）とBest Scoresを取得し、osu! Hubへ重複なく蓄積するAccount Sync設定。">
   <title>Account Sync | osu! Hub</title>
   <link rel="stylesheet" href="../css/styles.css">
 </head>
@@ -26,7 +26,7 @@
     <div>
       <p class="eyebrow">osu! api sync</p>
       <h1>Account Sync</h1>
-      <p class="lead">Supabase Edge Function経由でosu! API v2の公開プロフィールと最近のプレイを取得し、Resultsへ自動保存する。ブラウザへosu! Client ID / Client Secretを入力する必要はありません。</p>
+      <p class="lead">Supabase Edge Function経由でosu! API v2からRecent Plays（直近24時間）とBest Scoresを取得し、同じScore IDを重複させずResultsへ蓄積する。ブラウザへosu! Client ID / Client Secretを入力する必要はありません。</p>
     </div>
   </section>
 
@@ -60,25 +60,45 @@
           </select>
         </div>
         <div class="field">
+          <label for="scoreType">同期対象</label>
+          <select id="scoreType" name="scoreType" aria-describedby="scoreTypeHelp">
+            <option value="recent">Recent Plays (24h)</option>
+            <option value="best">Best Scores</option>
+          </select>
+          <small id="scoreTypeHelp" class="muted">Recent Playsは直近24時間です。</small>
+        </div>
+        <div class="field">
           <label for="syncLimit">1回の取得件数</label>
           <input id="syncLimit" name="limit" type="number" min="1" max="100" step="1" value="100">
         </div>
         <div class="field">
           <label for="includeFails">Failしたプレイ</label>
-          <select id="includeFails" name="includeFails">
+          <select id="includeFails" name="includeFails" aria-describedby="includeFailsHelp">
             <option value="1">含める</option>
             <option value="0">含めない</option>
           </select>
+          <small id="includeFailsHelp" class="muted">Recent Playsだけに適用します。</small>
+        </div>
+        <div class="field">
+          <label for="autoSyncOnOpen">自動蓄積</label>
+          <select id="autoSyncOnOpen" name="autoSyncOnOpen" aria-describedby="autoSyncHelp">
+            <option value="1">有効</option>
+            <option value="0">無効</option>
+          </select>
+          <small id="autoSyncHelp" class="muted">Account Syncを開いている間、Recentを一定間隔で自動同期します。</small>
+        </div>
+        <div class="field full">
+          <div class="notice"><strong>蓄積方式</strong><br>Recentは新しいScore IDだけ追加し、同じスコアは更新します。Bestから取得した古い自己ベストも同じResultsへ統合されるため、同期を重ねても重複は増えません。</div>
         </div>
         <div class="field full">
           <div class="actions">
             <button class="button ghost" type="submit">設定を保存</button>
             <button id="testService" class="button ghost" type="button">接続テスト</button>
-            <button id="syncNow" class="button primary" type="button">今すぐ同期</button>
+            <button id="syncNow" class="button primary" type="button">Recentを同期</button>
           </div>
         </div>
       </form>
-      <div id="syncStatus" class="notice" role="status" aria-live="polite" style="margin-top:18px">osu!アカウントを入力して接続テストしてください。</div>
+      <div id="syncStatus" class="notice" role="status" aria-live="polite" style="margin-top:18px">Recent Playsは直近24時間、Best Scoresは上位100件まで取得できます。</div>
     </section>
 
     <aside class="stack">
@@ -91,6 +111,8 @@
           <div class="practice-card"><span>Rank</span><div><strong id="accountRank">--</strong><small>Global Rank</small></div><span></span></div>
           <div class="practice-card"><span>ACC</span><div><strong id="accountAcc">--</strong><small>Profile Accuracy</small></div><span></span></div>
           <div class="practice-card"><span>Sync</span><div><strong id="lastSync">--</strong><small>最終同期</small></div><span></span></div>
+          <div class="practice-card"><span>Recent</span><div><strong id="lastRecentSync">--</strong><small>最終Recent同期</small></div><span></span></div>
+          <div class="practice-card"><span>Best</span><div><strong id="lastBestSync">--</strong><small>最終Best同期</small></div><span></span></div>
         </div>
       </section>
       <section class="panel flat">
@@ -100,8 +122,8 @@
   </div>
 
   <section class="panel">
-    <div class="panel-title"><div><p class="eyebrow">latest sync</p><h2>今回取得したリザルト</h2></div><a href="./results.html">Resultsで見る →</a></div>
-    <div id="syncPreview" class="list-empty">まだ同期していません。「接続テスト」後に「今すぐ同期」を実行してください。</div>
+    <div class="panel-title"><div><p class="eyebrow">latest sync</p><h2 id="previewTitle">今回取得したリザルト</h2></div><a href="./results.html">Resultsで見る →</a></div>
+    <div id="syncPreview" class="list-empty">まだ同期していません。RecentまたはBestを選んで同期してください。</div>
   </section>
 </main>
 
