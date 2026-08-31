@@ -12,6 +12,48 @@ try {
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $csPath = Join-Path $scriptDir "AudioSwitcher.cs"
+$svclPath = Join-Path $scriptDir "svcl.exe"
+
+function Normalize-AudioText([string]$Value) {
+  if ($null -eq $Value) { return "" }
+  return (($Value.Trim().ToLowerInvariant()) -replace '[\s_\-\(\)\[\]\{\}\\/]+', ' ').Trim()
+}
+
+function Test-AudioTextMatch([string]$Expected, [string]$Actual) {
+  $expectedNormalized = Normalize-AudioText $Expected
+  $actualNormalized = Normalize-AudioText $Actual
+  if ([string]::IsNullOrWhiteSpace($expectedNormalized) -or [string]::IsNullOrWhiteSpace($actualNormalized)) {
+    return $false
+  }
+  return ($expectedNormalized -eq $actualNormalized) -or
+         $expectedNormalized.Contains($actualNormalized) -or
+         $actualNormalized.Contains($expectedNormalized)
+}
+
+function Get-SvclColumn([string]$Alias, [string]$Column) {
+  if (-not (Test-Path $svclPath)) { return "" }
+  try {
+    $output = & $svclPath /GetColumnValue $Alias $Column 2>&1
+    if ($LASTEXITCODE -ne 0) { return "" }
+    $text = (($output | ForEach-Object { $_.ToString() }) -join "`n").Trim()
+    if ($text -match 'no items found') { return "" }
+    return $text
+  } catch {
+    return ""
+  }
+}
+
+if (-not $List.IsPresent -and -not [string]::IsNullOrWhiteSpace($DeviceName) -and (Test-Path $svclPath)) {
+  Start-Sleep -Milliseconds 350
+  foreach ($alias in @("DefaultRenderDeviceMulti", "DefaultRenderDevice", "DefaultRenderDeviceComm")) {
+    $name = Get-SvclColumn $alias "Name"
+    $id = Get-SvclColumn $alias "Command-Line Friendly ID"
+    if ((Test-AudioTextMatch $DeviceName $name) -or (Test-AudioTextMatch $DeviceName $id)) {
+      Write-Output ("VERIFIED_DEFAULT_SVCL: " + $(if ($name) { $name } else { $id }))
+      exit 0
+    }
+  }
+}
 
 if (-not (Test-Path $csPath)) {
   Write-Error "AudioSwitcher.cs not found: $csPath"
