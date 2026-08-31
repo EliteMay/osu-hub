@@ -1,5 +1,5 @@
 {
-  "latestVersion": "0.18.6",
+  "latestVersion": "0.18.7",
   "downloadUrl": "https://github.com/EliteMay/osu-hub/releases/latest",
-  "releaseNotes": "v0.18.5実機ログでHigh Definition Audio Deviceを指定した際、SVCLのアプリ音声セッション Firefox（\\Application\\Firefox）を出力デバイスと誤認する問題を確認。v0.18.6ではApplicationセッションを候補から除外し、\\Device\\...\\Render の実デバイスEndpointだけを対象にする。GenericなProvider名ではActive Endpointを優先し、同点候補は勝手に切り替えず停止する。"
+  "releaseNotes": "v0.18.6実機で完全なHigh Definition Audio DeviceのEndpoint IDを入力しても一致しないケースを確認。日本語Windowsではバックスラッシュが¥/￥として入力・コピーされる場合があるため、v0.18.7では¥/￥をWindowsの\\へ正規化して同じEndpoint IDとして扱う。Applicationセッション除外は維持し、SVCLのTypeが空でもRender Endpointを候補として扱えるよう互換性も改善。"
 }

@@ -11,7 +11,7 @@
     "scriptPath": "tools\\switch_audio_device.ps1",
     "customCommand": "",
     "command": "",
-    "memo": "v0.18.6ではSVCLのApplication音声セッションを再生デバイス候補から除外し、実デバイスEndpointだけを切替対象にする。同じProvider名の候補が複数ある場合はActive Endpointを優先し、同点なら安全のため停止する。",
+    "memo": "v0.18.7ではSVCLのApplication音声セッション除外を維持しつつ、日本語WindowsでEndpoint IDの区切りが¥/￥として入力・コピーされた場合も\\として正規化する。SVCLのTypeが空でもRender Endpointは候補として扱う。",
     "helperPath": "tools\\AudioSwitcher.cs",
     "soundVolumeViewPath": "",
     "nircmdPath": "tools\\nircmdc.exe",
@@ -55,6 +55,7 @@
     "osu!lazerは未設定でも一般的な保存先から自動検出する",
     "音声切替はSVCLモード推奨。まず「SVCLを自動取得」を押す",
     "音声デバイス一覧には実デバイスEndpointだけを表示し、Firefox等のApplicationセッションは候補にしない",
+    "日本語WindowsでEndpoint IDの区切りが¥/￥表示でも同じWindowsパスとして扱う",
     "複数候補が同じ強さで一致した場合は勝手に切り替えず、完全なID指定を求める",
     "入力名が一覧に存在しない場合は音声切替を実行しない"
   ],
@@ -64,5 +65,5 @@
     "memo": "v0.18.2以降はGitHub Releasesのelectron-updater用Metadataで起動時に自動確認します。versionUrlは旧版互換用として残します。",
     "lastDownloadUrl": ""
   },
-  "appVersion": "0.18.6"
+  "appVersion": "0.18.7"
 }

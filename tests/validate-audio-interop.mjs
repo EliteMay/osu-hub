@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
-const { isSvclEndpointDevice, chooseSvclDevice } = require('../src/audio-matcher.js');
+const { canonicalDeviceId, isSvclEndpointDevice, chooseSvclDevice } = require('../src/audio-matcher.js');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const fail = (message) => {
   console.error(`Audio interop validation failed: ${message}`);
@@ -82,7 +82,8 @@ for (const marker of [
   'isSvclEndpointDevice',
   'chooseSvclDevice',
   'stateBonus',
-  'ambiguous'
+  'ambiguous',
+  'replace(/[¥￥]/g'
 ]) {
   if (!audioMatcher.includes(marker)) fail(`src/audio-matcher.js is missing marker: ${marker}`);
 }
@@ -154,6 +155,38 @@ if (!genericHighDefinition.ok || genericHighDefinition.item?.id !== 'High Defini
 const exactHighDefinition = chooseSvclDevice(observedFixtures, 'High Definition Audio Device\\Device\\Speakers\\Render');
 if (!exactHighDefinition.ok || exactHighDefinition.item?.name !== 'スピーカー') {
   fail('The full High Definition Audio Device endpoint ID must select the Speakers endpoint exactly.');
+}
+
+const japaneseYenHighDefinition = chooseSvclDevice(observedFixtures, 'High Definition Audio Device¥Device¥Speakers¥Render');
+if (!japaneseYenHighDefinition.ok || japaneseYenHighDefinition.item?.name !== 'スピーカー') {
+  fail('Japanese yen-sign path separators must normalize to the same endpoint ID as backslashes.');
+}
+if (canonicalDeviceId('High Definition Audio Device￥Device￥Speakers￥Render') !== canonicalDeviceId('High Definition Audio Device\\Device\\Speakers\\Render')) {
+  fail('Full-width yen separators must normalize to Windows backslashes.');
+}
+
+const blankTypeRenderEndpoint = {
+  name: 'スピーカー',
+  id: 'High Definition Audio Device\\Device\\Speakers\\Render',
+  itemId: '{speaker-endpoint-blank-type}',
+  direction: 'Render',
+  type: '',
+  state: 'Active'
+};
+if (!isSvclEndpointDevice(blankTypeRenderEndpoint)) {
+  fail('A Render endpoint with a valid Device path must remain selectable even when SVCL Type is blank.');
+}
+
+const applicationWithoutType = {
+  name: 'Firefox',
+  id: 'High Definition Audio Device\\Application\\Firefox',
+  itemId: '',
+  direction: 'Render',
+  type: '',
+  state: 'Active'
+};
+if (isSvclEndpointDevice(applicationWithoutType)) {
+  fail('Application sessions must be rejected by ID even when SVCL Type is blank.');
 }
 
 const fxSound = chooseSvclDevice(observedFixtures, 'FxSound Speakers');
