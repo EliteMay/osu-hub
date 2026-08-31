@@ -1,5 +1,5 @@
 {
-  "siteVersion": "0.2.11",
+  "siteVersion": "0.2.12",
   "name": "osu! Hub",
   "repository": "https://github.com/EliteMay/osu-hub",
   "pagesUrl": "https://elitemay.github.io/osu-hub/",
@@ -16,7 +16,7 @@
   },
   "launcher": {
     "name": "osu Setup Launcher",
-    "version": "0.18.2",
+    "version": "0.18.3",
     "releasesUrl": "https://github.com/EliteMay/osu-hub/releases",
     "latestReleaseUrl": "https://github.com/EliteMay/osu-hub/releases/latest"
   }
