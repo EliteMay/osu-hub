@@ -17,16 +17,16 @@
 <div class="split">
   <section class="panel flat">
     <span class="badge">WINDOWS</span>
-    <h2>osu Setup Launcher <span class="muted" id="launcherVersion">0.18.0</span></h2>
+    <h2>osu Setup Launcher <span class="muted" id="launcherVersion">0.18.1</span></h2>
     <p class="lead">osu!を始める前の準備をまとめて実行。</p>
     <div class="data-list">
-      <div class="practice-card"><span>1</span><div><strong>音声出力切替</strong><small>SoundVolumeCommandLine / SVCL + Windows標準Fallback</small></div><span></span></div>
+      <div class="practice-card"><span>1</span><div><strong>音声出力切替</strong><small>SoundVolumeCommandLine / SVCL + Windows Core Audio Fallback</small></div><span></span></div>
       <div class="practice-card"><span>2</span><div><strong>OpenTabletDriver</strong><small>設定したアプリを起動</small></div><span></span></div>
       <div class="practice-card"><span>3</span><div><strong>遅延対策アプリ</strong><small>REALなどを起動</small></div><span></span></div>
       <div class="practice-card"><span>4</span><div><strong>osu!lazer</strong><small>自動検出または指定パスから起動</small></div><span></span></div>
     </div>
     <div class="actions"><a class="button primary" data-launcher-release href="https://github.com/EliteMay/osu-hub/releases/latest">Windows版をダウンロード</a><a class="button ghost" href="https://github.com/EliteMay/osu-hub" target="_blank" rel="noopener noreferrer">GitHubを見る</a></div>
-    <div class="notice" style="margin-top:16px"><strong>配布版: v0.18.0</strong><br>音声切替後の確認方法を改善し、SVCLの既定出力参照で確認できない場合はWindows標準PolicyConfigへFallbackします。インストーラーは未署名のため、Windows SmartScreenの警告が表示される場合があります。実Windows固有の動作は環境ごとの確認が必要です。</div>
+    <div class="notice" style="margin-top:16px"><strong>配布版: v0.18.1</strong><br>FxSound環境でFallbackがE_NOINTERFACEになった原因を修正。FallbackではSVCLの既定出力を公式の/GetColumnValue形式で再確認し、それでも必要な場合だけWindows Core Audioへ進みます。インストーラーは未署名のため、Windows SmartScreenの警告が表示される場合があります。実Windows固有の動作は環境ごとの確認が必要です。</div>
   </section>
   <aside class="stack">
     <section class="panel flat"><p class="eyebrow">web / desktop split</p><h2>役割を分離</h2><p class="muted">osu! Hub本体はGitHub Pagesで動作。音声切替や外部アプリ起動はブラウザから実行できないためDesktop Tools側で担当。</p></section>
