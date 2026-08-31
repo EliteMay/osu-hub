@@ -9,6 +9,7 @@ on:
       - "src/**"
       - "tools/**"
       - "tests/validate-audio-interop.mjs"
+      - "tests/validate-auto-update.mjs"
       - "data/config.json"
       - "version.json"
   push:
@@ -20,6 +21,7 @@ on:
       - "src/**"
       - "tools/**"
       - "tests/validate-audio-interop.mjs"
+      - "tests/validate-auto-update.mjs"
       - "data/config.json"
       - "version.json"
 
@@ -52,12 +54,17 @@ jobs:
       - name: Check Electron JavaScript syntax
         shell: pwsh
         run: |
+          node --check src/bootstrap.js
           node --check src/main.js
+          node --check src/updater.js
           node --check src/preload.js
           node --check src/renderer/app.js
 
       - name: Check audio interop regression guards
         run: node tests/validate-audio-interop.mjs
+
+      - name: Check auto-update regression guards
+        run: node tests/validate-auto-update.mjs
 
       - name: Check Windows audio fallback sources
         shell: powershell
@@ -79,28 +86,56 @@ jobs:
       - name: Build installer
         run: npm run build:win
 
-      - name: Verify installer
+      - name: Verify installer and update metadata
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $version = node -p "require('./package.json').version"
           $expected = "dist/osu_setup_${version}_setup.exe"
+          $metadata = "dist/latest.yml"
+          $blockmap = "$expected.blockmap"
+
           if (-not (Test-Path $expected)) {
             throw "Expected installer not found: $expected"
           }
+          if (-not (Test-Path $metadata)) {
+            throw "Auto-update metadata not found: $metadata"
+          }
+          if (-not (Test-Path $blockmap)) {
+            throw "Auto-update blockmap not found: $blockmap"
+          }
+
           $file = Get-Item $expected
           if ($file.Length -lt 1MB) {
             throw "Installer is unexpectedly small: $($file.Length) bytes"
           }
-          "INSTALLER_PATH=$($file.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          if ((Get-Item $metadata).Length -lt 50) {
+            throw "latest.yml is unexpectedly small"
+          }
+          if ((Get-Item $blockmap).Length -lt 50) {
+            throw "blockmap is unexpectedly small"
+          }
+
+          $metadataText = Get-Content $metadata -Raw
+          if ($metadataText -notmatch [regex]::Escape("osu_setup_${version}_setup.exe")) {
+            throw "latest.yml does not reference the current installer version"
+          }
+
+          "INSTALLER_PATH=$((Resolve-Path $expected).Path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "UPDATE_METADATA_PATH=$((Resolve-Path $metadata).Path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "UPDATE_BLOCKMAP_PATH=$((Resolve-Path $blockmap).Path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "LAUNCHER_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           Write-Host "Installer verified: $($file.Name) ($([math]::Round($file.Length / 1MB, 1)) MB)"
+          Write-Host "Auto-update metadata verified: latest.yml + $([IO.Path]::GetFileName($blockmap))"
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
           name: osu-setup-launcher-windows
-          path: dist/*.exe
+          path: |
+            dist/*.exe
+            dist/*.blockmap
+            dist/latest.yml
           if-no-files-found: error
 
       - name: Create or update GitHub Release
@@ -129,11 +164,18 @@ jobs:
           - OpenTabletDriver起動
           - REAL等の遅延対策アプリ起動
           - osu!lazer自動検出 / 起動
+          - v0.18.2以降のアプリ内One-click Update
+
+          ### Auto Update
+
+          ReleaseにはSetup.exeと同じVersionの `latest.yml` / `.blockmap` を含めます。
+          v0.18.2を一度手動インストールした後は、次回以降の新版をアプリ内から更新できます。
 
           ### 注意
 
           このインストーラーはコード署名していません。Windows SmartScreenの警告が表示される場合があります。
-          GitHub ActionsでのSetup.exe生成は確認済みですが、音声切替・外部exe起動などWindows実機固有の動作は環境ごとの確認が必要です。
+          Update MetadataのHash検証は利用しますが、Authenticode署名による発行元検証はありません。
+          GitHub ActionsでのSetup.exe生成は確認済みでも、音声切替・外部exe起動・実Windowsでの旧版→新版更新は別途実機確認が必要です。
           "@
           $notesPath = Join-Path $env:RUNNER_TEMP 'release-notes.md'
           Set-Content -Path $notesPath -Value $notes -Encoding utf8
@@ -146,8 +188,8 @@ jobs:
           }
           if ($LASTEXITCODE -ne 0) { throw "Failed to create or update release $tag" }
 
-          gh release upload $tag $env:INSTALLER_PATH --repo $env:GITHUB_REPOSITORY --clobber
-          if ($LASTEXITCODE -ne 0) { throw "Failed to upload installer to release $tag" }
+          gh release upload $tag $env:INSTALLER_PATH $env:UPDATE_METADATA_PATH $env:UPDATE_BLOCKMAP_PATH --repo $env:GITHUB_REPOSITORY --clobber
+          if ($LASTEXITCODE -ne 0) { throw "Failed to upload installer/update metadata to release $tag" }
 
       - name: Build summary
         shell: pwsh
@@ -158,7 +200,8 @@ jobs:
 
           - Version: $env:LAUNCHER_VERSION
           - Installer: osu_setup_${env:LAUNCHER_VERSION}_setup.exe
+          - Auto update metadata: latest.yml + blockmap
           - Result: $releaseState
           - Code signing: disabled
-          - Windows runtime behavior: requires real-device verification
+          - Windows runtime / old-version update behavior: requires real-device verification
           "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append

@@ -60,8 +60,8 @@
   "updateCheck": {
     "enabled": true,
     "versionUrl": "https://raw.githubusercontent.com/EliteMay/osu-hub/main/version.json",
-    "memo": "更新確認はosu-hubのversion.jsonを参照します。自動上書き更新は行いません。",
+    "memo": "v0.18.2以降はGitHub Releasesのelectron-updater用Metadataで起動時に自動確認します。versionUrlは旧版互換用として残します。",
     "lastDownloadUrl": ""
   },
-  "appVersion": "0.18.0"
+  "appVersion": "0.18.2"
 }

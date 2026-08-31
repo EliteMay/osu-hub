@@ -2,6 +2,63 @@
 
 Web Versionの正本は `data/site.json` の `siteVersion` です。Desktop Launcher Versionの正本は `package.json` の `version` です。
 
+## Web 0.2.11 - 2026-08-31
+
+### Changed
+
+- Desktop Toolsの配布表示をSetup Launcher `v0.18.2` へ更新
+- v0.18.2からのOne-click Update導線を説明
+- v0.18.1以前からv0.18.2へは最後の1回だけSetup.exeを手動実行する必要があることを明記
+- `web-project-guide` 1.6.0へ追従
+
+## Desktop 0.18.2 - 2026-08-31
+
+### Added
+
+- `electron-updater` + GitHub Releasesによるアプリ内One-click Updateを追加
+- Launcher起動後にBackgroundで新版を確認
+- 新Versionがある場合に `今すぐ更新 / あとで` を表示
+- `今すぐ更新` 1回でDownload → Launcher終了 → Install → Restartへ進む導線を追加
+- Download進捗をWindows taskbarへ表示
+- Update失敗時に現在Versionを継続利用し、GitHub Releasesを開けるFallbackを追加
+- Updater LogをElectron `userData/logs/updater.log` へ保存
+
+### Distribution
+
+- electron-builderのGitHub publish providerを設定
+- Release Artifactを次の3点へ拡張
+  - `osu_setup_<version>_setup.exe`
+  - `osu_setup_<version>_setup.exe.blockmap`
+  - `latest.yml`
+- Windows CIでInstaller / Update Metadata / blockmapの存在とVersion整合を確認
+- PRではReleaseを作らず、main merge後だけ3 Artifactを同一ReleaseへUpload
+
+### Upgrade Path
+
+- v0.18.1以前にはUpdater Runtimeがないため、**v0.18.2だけはSetup.exeを1回手動Installする**
+- v0.18.2導入後は将来Versionをアプリ内から更新可能
+- Electron `userData`保存方式と`configVersion: 17`は変更しない
+
+### Security / Limitations
+
+- `latest.yml`等のUpdate Metadataに含まれるHash / Integrity情報を利用
+- GitHub Providerを固定し、任意Update Provider入力は公開しない
+- 現在のInstallerは未署名で、AuthenticodeによるPublisher検証はない
+- Windows SmartScreen警告が表示される場合がある
+- Code Signingは今後の公開配布強化候補
+
+### Regression Guard
+
+- `tests/validate-auto-update.mjs` を追加
+- Updater bootstrap、GitHub Provider、One-click flow、manual fallback、Release MetadataをStatic Validation
+- `tests/validate-web.mjs` でもGuide Version / Auto Update / Release Pipeline整合を確認
+
+### Verification
+
+- Static / CIでInstallerとUpdate Metadata生成を確認する
+- 実Windowsの `v0.18.2 → 将来Version` One-click Update / Restartは将来Version公開後に再確認する
+- CI成功だけで実機Update成功扱いにしない
+
 ## Web 0.2.10 - 2026-08-31
 
 ### Changed

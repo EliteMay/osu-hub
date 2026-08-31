@@ -10,7 +10,13 @@ contextBridge.exposeInMainWorld("osuLauncher", {
   listAudioDevices: (audioSwitch) => ipcRenderer.invoke("audio:list", audioSwitch),
   testAudioSwitch: (audioSwitch) => ipcRenderer.invoke("audio:test", audioSwitch),
   checkUpdate: (updateCheck) => ipcRenderer.invoke("update:check", updateCheck),
-  openUpdateUrl: (url) => ipcRenderer.invoke("update:open", url),
+  openUpdateUrl: () => ipcRenderer.invoke("update:open"),
+  onUpdateStatus: (callback) => {
+    if (typeof callback !== "function") return () => {};
+    const handler = (_event, status) => callback(status);
+    ipcRenderer.on("update:status", handler);
+    return () => ipcRenderer.removeListener("update:status", handler);
+  },
   openToolsFolder: () => ipcRenderer.invoke("tools:openToolsFolder"),
   openNirCmdPage: () => ipcRenderer.invoke("tools:openNirCmdPage"),
   installNirCmd: () => ipcRenderer.invoke("tools:installNirCmd"),

@@ -63,6 +63,19 @@
 - Guide candidate: yes
 - Guide note: OS固有処理では段階Breadcrumb / verification detailsが原因特定を大幅に速める。
 
+### PL-S-002 Setup.exe継続配布をOne-click Updateへ移行する
+
+- Date: 2026-08-31
+- Goal / Problem: 新Versionごとに利用者がGitHub Releaseを開き、Setup.exeを探して手動実行する負担を減らす。
+- Adopted Pattern: `electron-updater` + GitHub Releases + NSISを使い、起動時Background check → `今すぐ更新 / あとで` → Download → `quitAndInstall` → Restartの流れにした。ReleaseへSetup.exeだけでなく`latest.yml`と`.blockmap`を同じVersionで配布し、失敗時は現在Version継続 + ReleaseページFallbackを残す。
+- Why it worked: Release Pipelineを更新MetadataのSource of Truthとして再利用でき、Launcherの既存`userData`保存方式を変えずに更新UXだけ改善できる。
+- Trade-off: v0.18.1以前にはUpdaterがないためv0.18.2だけは最後の1回の手動Installが必要。未署名InstallerではAuthenticodeによるPublisher検証がないため、公開範囲を広げる場合はCode Signingが必要になる。
+- Reuse when: GitHub Releases等で継続配布するインストール型Electron / NSISアプリ。
+- Avoid when: Portable単発Tool、Release Providerを安全に固定できない場合、更新で保存互換性を保証できない場合。
+- Related files / tests: `src/bootstrap.js`, `src/updater.js`, `package.json`, `.github/workflows/build-windows.yml`, `tests/validate-auto-update.mjs`
+- Guide candidate: yes
+- Guide note: `web-project-guide` 1.6.0へ「継続配布するインストール型ElectronはOne-click UpdateをCONDITIONAL SHOULDとして優先」を還元済み。CIでMetadata生成を確認しても旧Version→新Versionの実機更新確認は別に残す。
+
 ---
 
 ## Guide Feedback Queue
@@ -71,3 +84,4 @@
 |---|---|---|---|---|
 | PL-F-001 | failure | COM IID/GUIDは公式SDK照合 + Static Guardを持つ | v0.18.0 E_NOINTERFACE実機ログ | Electron / Windows固有機能ルールへ一般化できるか確認 |
 | PL-F-002 | failure | OS変更コマンド成功とread-back成功を分離 | v0.17.0〜v0.18.0音声確認失敗 | Reliability / Electron章への追加候補 |
+| PL-S-002 | success | 継続配布ElectronはRelease Metadataを揃えOne-click Updateを優先 | Setup Launcher v0.18.2 | Guide 1.6.0へ反映済み。次は実WindowsのN→N+1更新Evidenceを追加 |

@@ -10,7 +10,7 @@ osu!のプレイ記録、アカウント同期、AIコーチング、練習管�
 
 ## Project Guide
 
-`EliteMay/web-project-guide` **Guide Version 1.3.0** を採用しています。
+`EliteMay/web-project-guide` **Guide Version 1.6.0** を採用しています。
 
 Project Profile:
 
@@ -24,6 +24,7 @@ Source of Truth:
 - Web Storage Schema: `js/storage.js#SCHEMA_VERSION`
 - Desktop Version: `package.json#version`
 - Desktop Update Metadata: `version.json`
+- Electron Auto Update Provider: `package.json#build.publish`
 - Supabase Edge Function source: `supabase/functions/osu-sync/index.ts`
 - Supabase DB migration: `supabase/migrations/`
 
@@ -141,10 +142,10 @@ Importは `parse → validation → recovery snapshot → transaction write → 
 
 ## Desktop Tools
 
-現在の配布版:
+現在の配布予定版:
 
 ```text
-osu Setup Launcher v0.18.1
+osu Setup Launcher v0.18.2
 https://github.com/EliteMay/osu-hub/releases/latest
 ```
 
@@ -154,8 +155,9 @@ https://github.com/EliteMay/osu-hub/releases/latest
 - OpenTabletDriver起動
 - REAL等の遅延対策アプリ起動
 - osu!lazer自動検出 / 起動
+- アプリ内One-click Update
 
-### 音声切替 v0.18.1
+### 音声切替
 
 既定はSoundVolumeCommandLine (`svcl.exe`) を使用します。
 
@@ -171,7 +173,45 @@ https://github.com/EliteMay/osu-hub/releases/latest
 
 v0.18.0実機ログでは、SVCLの対象照合とコマンド実行後にWindows標準Fallbackへ入り、Core Audioの `IMMDeviceCollection` を誤ったIIDで宣言していたため `E_NOINTERFACE (0x80004002)` になっていました。v0.18.1でWindows SDKと一致するIIDへ修正し、Fallbackの先頭でもSVCLの既定出力を公式の `/GetColumnValue` 形式で再確認します。
 
-既存のuserData設定、FxSound等の音声デバイス名、OpenTabletDriver / REAL / osu! pathは更新時に維持する構成です。
+### Auto Update v0.18.2
+
+v0.18.2から`electron-updater` + GitHub Releasesを使ったOne-click Updateへ移行します。
+
+```text
+Launcher起動
+↓
+BackgroundでGitHub Releasesを確認
+↓
+新Versionあり
+↓
+「今すぐ更新 / あとで」
+↓
+今すぐ更新
+↓
+Download
+↓
+Launcherを終了してInstall
+↓
+新Versionで再起動
+```
+
+重要:
+
+- **v0.18.1以前にはUpdaterが入っていないため、v0.18.2への更新だけはSetup.exeを1回手動実行する必要があります。**
+- v0.18.2を一度導入した後は、将来の新版をアプリ内の「今すぐ更新」から更新できる構成です。
+- 起動時の自動確認は設定からOFFにできます。
+- 更新失敗時は現在Versionを継続利用でき、GitHub Releasesを開くFallbackがあります。
+- 設定はElectron `userData` に保存しているため、Installer更新で上書きしない構成です。
+
+GitHub Releaseには同じVersionのAuto Update Artifactを揃えます。
+
+```text
+osu_setup_<version>_setup.exe
+osu_setup_<version>_setup.exe.blockmap
+latest.yml
+```
+
+`latest.yml`のHash / MetadataをUpdaterが利用します。現在のInstallerはコード署名していないためWindows SmartScreenが表示される場合があり、Authenticodeによる発行元検証はありません。公開範囲を広げる場合はCode Signingを優先課題とします。
 
 ### Windows Build / Release
 
@@ -179,19 +219,18 @@ v0.18.0実機ログでは、SVCLの対象照合とコマンド実行後にWindow
 
 PR:
 
-- `node --check` でElectron JavaScript構文確認
-- Audio COM IID / fallback static regression check
+- Electron JavaScript構文確認
+- Audio COM IID / Fallback regression check
+- Auto Update regression check
 - installer build
-- Setup.exe存在・最低サイズ確認
+- Setup.exe / `latest.yml` / `.blockmap` の存在・Version整合確認
 - Actions Artifact保存
 - Releaseは作成しない
 
 main:
 
 - 上記確認後、`package.json#version` のGitHub Releaseを作成または更新
-- Setup.exeをRelease assetとしてupload
-
-installerはコード署名していないためWindows SmartScreenが表示される場合があります。
+- Setup.exe / `latest.yml` / `.blockmap` を同じReleaseへupload
 
 ## GitHub Actions
 
@@ -210,9 +249,11 @@ Cloudflare Worker方式は本番でosu!側429を継続再現したため現行Ru
 
 Pages ArtifactはWebファイルだけを公開し、Electron source、bat、Supabase source、Secretは公開Artifactへ混ぜません。
 
-`tests/validate-web.mjs` ではVersion、Project Profile、Secret混入、Import Recovery、Supabase endpoint、Recent / Best、自動蓄積、Token更新Workflow、Windows Release導線、旧Cloudflare Runtime再混入などを検査します。
+`tests/validate-web.mjs` ではVersion、Project Profile、Secret混入、Import Recovery、Supabase endpoint、Recent / Best、自動蓄積、Token更新Workflow、Windows Release / Auto Update導線、旧Cloudflare Runtime再混入などを検査します。
 
 `tests/validate-audio-interop.mjs` ではCore Audio COM IIDとFallback検証経路の再発防止を行います。
+
+`tests/validate-auto-update.mjs` ではUpdater bootstrap、GitHub Provider、One-click flow、Release Metadata、manual fallbackを検査します。
 
 ## 崩してはいけない仕様
 
@@ -226,7 +267,8 @@ Pages ArtifactはWebファイルだけを公開し、Electron source、bat、Sup
 - AI Coachingに有料APIを必須化しない
 - Electron Launcherを削除しない
 - 外部Responseが想定形式でない場合に不正データを保存しない
-- Setup.exe生成成功前にReleaseを成功扱いしない
+- Setup.exe / Update Metadata生成成功前にReleaseを成功扱いしない
+- Auto Update失敗で現在VersionやuserDataを破壊しない
 - Windows固有処理を静的コード確認だけで成功扱いしない
 
 ## 未確認 / 今後
@@ -236,8 +278,10 @@ Pages ArtifactはWebファイルだけを公開し、Electron source、bat、Sup
 - Backup / Import / Rollback実ブラウザE2E
 - Recent 24時間より前を含む全履歴ページング同期
 - 同期済みResultsをAI Coachingへ直接選択する機能
-- Windows実機でv0.18.1のFxSound音声切替再確認
-- update install後のuserData維持確認
-- Root Electronの `package-lock.json` は次回dependency導入・更新時に実package managerで生成する
+- Windows実機でv0.18.1以降のFxSound音声切替再確認
+- v0.18.2 → 将来Versionの実Windows One-click Update / Restart確認
+- Auto Update後のuserData設定維持確認
+- Installer Code Signing
+- Root Electronの `package-lock.json` をdependency変更に合わせて生成・追跡する
 
 未確認項目は確認済みとして扱いません。

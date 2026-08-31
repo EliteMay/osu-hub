@@ -1,5 +1,5 @@
 {
-  "latestVersion": "0.18.1",
+  "latestVersion": "0.18.2",
   "downloadUrl": "https://github.com/EliteMay/osu-hub/releases/latest",
-  "releaseNotes": "FxSound環境でWindows標準FallbackがE_NOINTERFACEになった原因を修正。IMMDeviceCollectionの正しいIIDへ直し、FallbackではSVCLのDefaultRenderDevice系を公式の/GetColumnValue形式で先に確認してからCore Audioへ進むようにしました。"
+  "releaseNotes": "アプリ内One-click Updateを追加。v0.18.2以降は起動時にGitHub Releasesを確認し、新版があれば『今すぐ更新』1回でダウンロード・再起動・更新できます。ReleaseにはSetup.exeに加えてlatest.ymlとblockmapを配布します。"
 }
