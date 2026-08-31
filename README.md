@@ -10,7 +10,7 @@ osu!のプレイ記録、アカウント同期、AIコーチング、練習管�
 
 ## Project Guide
 
-`EliteMay/web-project-guide` **Guide Version 1.2.0** を採用しています。
+`EliteMay/web-project-guide` **Guide Version 1.3.0** を採用しています。
 
 Project Profile:
 
@@ -170,20 +170,27 @@ Importは `parse → validation → recovery snapshot → transaction write → 
 
 ## Desktop Tools
 
-既存の `osu Setup Launcher v0.17.0` は削除せず継続します。
+`osu Setup Launcher v0.17.0` をGitHub Releasesで配布しています。
+
+```text
+Release: https://github.com/EliteMay/osu-hub/releases/tag/v0.17.0
+Installer: osu_setup_0.17.0_setup.exe
+```
 
 - 音声出力切替
 - OpenTabletDriver起動
 - REAL等の遅延対策アプリ起動
 - osu!lazer自動検出 / 起動
 
-Windows固有処理は実Windowsで未確認の項目を確認済み扱いしません。
+`.github/workflows/build-windows.yml` はDesktop関連のmain変更時にWindows上でinstallerをbuildし、Setup.exeを検証してからActions ArtifactとGitHub Releaseへ公開します。
+
+現在のinstallerはコード署名していないため、Windows SmartScreenの警告が表示される場合があります。GitHub Actions上のSetup.exe生成は確認済みですが、音声切替・外部exe起動などWindows固有処理は実Windows環境ごとの確認が必要です。
 
 ## GitHub Pages / CI
 
 Pages ArtifactはWebファイルだけを公開します。Supabase function source、Electron source、bat、Secret等はPages Artifactへ含めません。
 
-`tests/validate-web.mjs` / `Check web` では、JS/JSON/HTML、Version、Project Profile、Secret混入、Import Recovery、Supabase endpoint、Recent / Best、5分自動蓄積、Token更新Workflow、旧Cloudflare Runtime再混入などを確認します。
+`tests/validate-web.mjs` / `Check web` では、JS/JSON/HTML、Version、Project Profile、Secret混入、Import Recovery、Supabase endpoint、Recent / Best、5分自動蓄積、Token更新Workflow、Windows Release導線、旧Cloudflare Runtime再混入などを確認します。
 
 ## 崩してはいけない仕様
 
@@ -197,16 +204,16 @@ Pages ArtifactはWebファイルだけを公開します。Supabase function sou
 - AI Coachingに有料APIを必須化しない
 - Electron Launcherを削除しない
 - 外部Responseが想定形式でない場合に不正データを保存しない
+- Setup.exe生成成功前にReleaseを成功扱いしない
 
 ## 未確認 / 今後
 
-- Web 0.2.7の実ブラウザでBest Scores 100件同期
-- Web 0.2.7のRecent自動蓄積を5分以上開いた実ブラウザで確認
+- Web 0.2.7以降の実ブラウザでBest Scores 100件同期
+- Recent自動蓄積を5分以上開いた実ブラウザで確認
 - Backup / Import / Rollbackの実ブラウザE2E
 - Recent Scoresの24時間より前を含む全履歴ページング同期
 - 同期済みResultsをAI Coachingへ直接選択して含める機能
-- Windows実機でのSetup Launcher確認
-- Setup.exe初回GitHub Release
+- Windows実機でのSetup Launcher音声切替・外部exe起動確認
 - Root Electronの `package-lock.json` は次回dependency導入・更新時に実package managerで生成する
 
 未確認項目は確認済みとして扱いません。
