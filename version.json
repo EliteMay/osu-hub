@@ -1,5 +1,5 @@
 {
-  "latestVersion": "0.18.4",
+  "latestVersion": "0.18.5",
   "downloadUrl": "https://github.com/EliteMay/osu-hub/releases/latest",
-  "releaseNotes": "FxSoundのようにSVCLでは英語の『FxSound Speakers』、Windows Core Audioでは日本語の『スピーカー (FxSound Audio Enhancer)』など表示言語が異なる場合でも同じEndpointを特定できるよう修正。speaker/スピーカー等の汎用デバイス種別語を照合Tokenから除外し、FxSound等の安定Tokenを優先します。失敗時は利用可能なCore Audioデバイス名もログへ表示します。"
+  "releaseNotes": "v0.18.4実機ログでFxSoundがSVCLには存在する一方、Core AudioのActive一覧には存在しないことを確認。v0.18.5ではCore AudioのDisabled/Unplugged/NotPresentも診断し、FxSound対象時はFxSound.exe起動、Disabled時はSVCL /Enable、Active化待機の後に既定出力を再設定します。失敗時は各EndpointのStateもログへ表示します。"
 }
