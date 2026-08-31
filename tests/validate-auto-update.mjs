@@ -41,7 +41,8 @@ for (const marker of [
 ]) requireText(updater, marker, 'src/updater.js');
 
 if (!/ipcMain\.handle\("update:open",\s*async\s*\(\)\s*=>/.test(updater)) errors.push('update:open must not accept an arbitrary renderer URL.');
-if (/ipcMain\.handle\("update:open"[^]*?shell\.openExternal\([^)]*url/i.test(updater)) errors.push('update:open must use the fixed GitHub Releases fallback URL.');
+if (/shell\.openExternal\(\s*(?:url|target)\s*\)/i.test(updater) || /String\(url\)/.test(updater)) errors.push('update:open must not forward an arbitrary renderer URL.');
+if (!/shell\.openExternal\(RELEASE_URL\)/.test(updater)) errors.push('Manual update fallback must use the fixed RELEASE_URL.');
 
 if (config.updateCheck?.enabled !== true) errors.push('Startup update checks must default to enabled.');
 if (!/id=["']openUpdateButton["'][^>]*>今すぐ更新</.test(renderer)) errors.push('Renderer must expose an 今すぐ更新 button.');
