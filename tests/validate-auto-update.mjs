@@ -40,6 +40,9 @@ for (const marker of [
   'https://github.com/EliteMay/osu-hub/releases/latest'
 ]) requireText(updater, marker, 'src/updater.js');
 
+if (!/ipcMain\.handle\("update:open",\s*async\s*\(\)\s*=>/.test(updater)) errors.push('update:open must not accept an arbitrary renderer URL.');
+if (/ipcMain\.handle\("update:open"[^]*?shell\.openExternal\([^)]*url/i.test(updater)) errors.push('update:open must use the fixed GitHub Releases fallback URL.');
+
 if (config.updateCheck?.enabled !== true) errors.push('Startup update checks must default to enabled.');
 if (!/id=["']openUpdateButton["'][^>]*>今すぐ更新</.test(renderer)) errors.push('Renderer must expose an 今すぐ更新 button.');
 if (!/起動時にGitHub Releasesを確認/.test(renderer)) errors.push('Renderer must explain startup update checks.');
@@ -61,4 +64,4 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log('Auto-update bootstrap, GitHub provider, one-click flow, release metadata, and fallback guards: OK');
+console.log('Auto-update bootstrap, fixed GitHub provider/fallback, one-click flow, release metadata, and regression guards: OK');
