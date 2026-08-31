@@ -2,6 +2,79 @@
 
 Web Versionの正本は `data/site.json` の `siteVersion` です。Desktop Launcher Versionの正本は `package.json` の `version` です。
 
+## Web 0.2.14 - 2026-08-31
+
+### Changed
+
+- Desktop Toolsの配布表示をSetup Launcher `v0.18.5` へ更新
+- FxSound EndpointがSVCLには存在する一方、Core Audio Active一覧に存在しないケースのState診断 / Active化手順を説明
+- v0.18.2以降のOne-click Update導線は維持
+
+## Desktop 0.18.5 - 2026-08-31
+
+### Fixed
+
+- SVCLがDisabled / Unplugged Endpointも表示する一方、Core Audio FallbackがActive Endpointだけを列挙していたProvider間のState filter差を修正
+- Core AudioでActive / Disabled / NotPresent / UnpluggedをState付きで列挙できるよう拡張
+- FxSound対象時にFxSound process readinessを確認し、未起動なら既知Install pathから起動を試行
+- FxSound EndpointがDisabledの場合にSVCL `/Enable` を試行
+- EndpointがActiveになるまで短時間待機してから既定出力を再設定
+- Active化できない場合は `STATE=` とState付き `AVAILABLE_DEVICES` を表示
+
+### Regression Guard
+
+- `AudioSwitcher.cs` のAll-state列挙、`State`、`IsActive`をStatic Guardへ追加
+- PowerShell Self TestでActive FxSound候補をInactive候補より優先することを確認
+- FxSound queryがArctis Endpointへ誤一致しないNegative Fixtureを維持
+
+### Compatibility
+
+- `configVersion: 17`変更なし
+- Electron `userData`保存方式変更なし
+- SVCL第一経路 / Core Audio Fallback / One-click Update方式変更なし
+
+### Verification
+
+- PR最終CommitでPowerShell 5.1 parse / C# compile / Audio interop / Auto Update / NSIS build / Metadata整合を確認する
+- 実WindowsのFxSound Endpoint Active化と既定出力切替はv0.18.5へ更新後に実機確認する
+
+## Web 0.2.13 - 2026-08-31
+
+### Changed
+
+- Desktop Toolsの配布表示をSetup Launcher `v0.18.4` へ更新
+- FxSoundの表示言語差に対応した音声照合説明を追加
+
+## Desktop 0.18.4 - 2026-08-31
+
+### Fixed
+
+- `FxSound Speakers` の `speakers` のようなローカライズ可能なデバイス種別語を識別Tokenから除外
+- `fxsound` 等の安定したVendor / Product Tokenを優先してCore Audio候補を照合
+- 未一致時に `MATCH_TOKENS` と `AVAILABLE_DEVICES` を表示
+
+### Result
+
+- v0.18.4実WindowsログでFxSoundはSVCLに存在する一方、Core Audio Active一覧には存在しないことが判明し、v0.18.5でState filter差として修正を継続
+
+## Web 0.2.12 - 2026-08-31
+
+### Changed
+
+- Desktop Toolsの配布表示をSetup Launcher `v0.18.3` へ更新
+- FxSoundのSVCL名とCore Audio Friendly Nameの語順差に対応した説明を追加
+
+## Desktop 0.18.3 - 2026-08-31
+
+### Fixed
+
+- `FxSound Speakers` と `Speakers (FxSound Audio Enhancer)` のようにProvider間でFriendly Nameの語順が異なる場合をToken照合で吸収
+- FxSound語順差のPowerShell Self TestをWindows CIへ追加
+
+### Result
+
+- v0.18.3実Windowsログで英語 `speakers` と日本語表示名の差が残ることが分かり、v0.18.4で識別Tokenを改善
+
 ## Web 0.2.11 - 2026-08-31
 
 ### Changed
