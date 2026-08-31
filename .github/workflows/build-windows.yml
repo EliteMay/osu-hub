@@ -59,6 +59,23 @@ jobs:
       - name: Check audio interop regression guards
         run: node tests/validate-audio-interop.mjs
 
+      - name: Check Windows audio fallback sources
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tokens = $null
+          $parseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path 'tools/switch_audio_device.ps1'),
+            [ref]$tokens,
+            [ref]$parseErrors
+          ) | Out-Null
+          if ($parseErrors.Count -gt 0) {
+            $parseErrors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
+          Add-Type -Path (Resolve-Path 'tools/AudioSwitcher.cs') -ErrorAction Stop
+
       - name: Build installer
         run: npm run build:win
 
