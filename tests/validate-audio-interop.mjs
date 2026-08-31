@@ -1,8 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const require = createRequire(import.meta.url);
+const { isSvclEndpointDevice, chooseSvclDevice } = require('../src/audio-matcher.js');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const fail = (message) => {
   console.error(`Audio interop validation failed: ${message}`);
@@ -12,6 +15,8 @@ const fail = (message) => {
 const audioSwitcher = read('tools/AudioSwitcher.cs');
 const fallbackScript = read('tools/switch_audio_device.ps1');
 const windowsWorkflow = read('.github/workflows/build-windows.yml');
+const desktopMain = read('src/main.js');
+const audioMatcher = read('src/audio-matcher.js');
 
 const correctCollectionIid = '0BD7A1BE-7A1A-44DB-8397-CC5392387B5E';
 const brokenCollectionIid = '0BD7A1BE-7A1A-44DB-8397-C0A53CAD458F';
@@ -63,6 +68,25 @@ for (const marker of [
   if (!fallbackScript.includes(marker)) fail(`switch_audio_device.ps1 is missing marker: ${marker}`);
 }
 
+for (const marker of [
+  'require("./audio-matcher")',
+  '.filter(isSvclEndpointDevice)',
+  'chooseSvclDevice(before.items, target)',
+  '複数の再生デバイスが同じ強さで一致したため'
+]) {
+  if (!desktopMain.includes(marker)) fail(`src/main.js is missing endpoint-selection guard: ${marker}`);
+}
+
+for (const marker of [
+  '\\application\\',
+  'isSvclEndpointDevice',
+  'chooseSvclDevice',
+  'stateBonus',
+  'ambiguous'
+]) {
+  if (!audioMatcher.includes(marker)) fail(`src/audio-matcher.js is missing marker: ${marker}`);
+}
+
 if (/&\s+\$svclPath\s+\/Stdout\s+\/GetColumnValue/i.test(fallbackScript)) {
   fail('SVCL /GetColumnValue fallback must use the documented direct command form without /Stdout.');
 }
@@ -73,6 +97,89 @@ if (!/\/Enable\s+\$matched\.Id/.test(fallbackScript)) {
 
 if (!windowsWorkflow.includes('switch_audio_device.ps1 -SelfTest')) {
   fail('Windows installer workflow must execute the audio matcher self-test.');
+}
+
+const observedFixtures = [
+  {
+    name: 'Firefox',
+    id: 'High Definition Audio Device\\Application\\Firefox',
+    itemId: '',
+    direction: 'Render',
+    type: 'Application',
+    state: 'Active'
+  },
+  {
+    name: 'スピーカー',
+    id: 'High Definition Audio Device\\Device\\Speakers\\Render',
+    itemId: '{speaker-endpoint}',
+    direction: 'Render',
+    type: 'Device',
+    state: 'Active'
+  },
+  {
+    name: 'ヘッドホン',
+    id: 'High Definition Audio Device\\Device\\Headphones\\Render',
+    itemId: '{headphone-endpoint}',
+    direction: 'Render',
+    type: 'Device',
+    state: 'NotPresent'
+  },
+  {
+    name: 'FxSound Speakers',
+    id: 'FxSound Audio Enhancer\\Device\\FxSound Speakers\\Render',
+    itemId: '{fxsound-endpoint}',
+    direction: 'Render',
+    type: 'Device',
+    state: 'Active'
+  },
+  {
+    name: '2- Arctis GameBuds',
+    id: '2- Arctis GameBuds\\Device\\Render',
+    itemId: '{arctis-endpoint}',
+    direction: 'Render',
+    type: 'Device',
+    state: 'Active'
+  }
+];
+
+if (isSvclEndpointDevice(observedFixtures[0])) {
+  fail('Application audio sessions like Firefox must never be treated as output device endpoints.');
+}
+
+const genericHighDefinition = chooseSvclDevice(observedFixtures, 'High Definition Audio Device');
+if (!genericHighDefinition.ok || genericHighDefinition.item?.id !== 'High Definition Audio Device\\Device\\Speakers\\Render') {
+  fail('The observed High Definition Audio Device query must select the active Speakers endpoint, not Firefox or an inactive endpoint.');
+}
+
+const exactHighDefinition = chooseSvclDevice(observedFixtures, 'High Definition Audio Device\\Device\\Speakers\\Render');
+if (!exactHighDefinition.ok || exactHighDefinition.item?.name !== 'スピーカー') {
+  fail('The full High Definition Audio Device endpoint ID must select the Speakers endpoint exactly.');
+}
+
+const fxSound = chooseSvclDevice(observedFixtures, 'FxSound Speakers');
+if (!fxSound.ok || fxSound.item?.name !== 'FxSound Speakers') {
+  fail('FxSound exact-name selection must remain supported.');
+}
+
+const ambiguousFixtures = [
+  {
+    name: 'Output A',
+    id: 'Same Provider\\Device\\SpeakersA\\Render',
+    direction: 'Render',
+    type: 'Device',
+    state: 'Active'
+  },
+  {
+    name: 'Output B',
+    id: 'Same Provider\\Device\\SpeakersB\\Render',
+    direction: 'Render',
+    type: 'Device',
+    state: 'Active'
+  }
+];
+const ambiguous = chooseSvclDevice(ambiguousFixtures, 'Same Provider');
+if (ambiguous.ok || ambiguous.reason !== 'ambiguous') {
+  fail('Equal-strength endpoint matches must stop as ambiguous instead of selecting arbitrarily.');
 }
 
 console.log('Audio interop validation: OK');
