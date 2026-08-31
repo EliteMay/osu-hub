@@ -1,5 +1,5 @@
 {
-  "latestVersion": "0.18.3",
+  "latestVersion": "0.18.4",
   "downloadUrl": "https://github.com/EliteMay/osu-hub/releases/latest",
-  "releaseNotes": "FxSoundのSVCL名『FxSound Speakers』とWindows Core AudioのFriendly Name『Speakers (FxSound Audio Enhancer)』のように語順・表記が異なる場合でも、Token照合で同じ再生Endpointを特定してWindows標準Fallbackを実行できるよう修正。Windows CIにFxSound語順差のSelf Testを追加。v0.18.2からはアプリ内One-click Updateで更新できます。"
+  "releaseNotes": "FxSoundのようにSVCLでは英語の『FxSound Speakers』、Windows Core Audioでは日本語の『スピーカー (FxSound Audio Enhancer)』など表示言語が異なる場合でも同じEndpointを特定できるよう修正。speaker/スピーカー等の汎用デバイス種別語を照合Tokenから除外し、FxSound等の安定Tokenを優先します。失敗時は利用可能なCore Audioデバイス名もログへ表示します。"
 }
