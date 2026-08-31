@@ -11,7 +11,7 @@
     "scriptPath": "tools\\switch_audio_device.ps1",
     "customCommand": "",
     "command": "",
-    "memo": "v0.18.3ではSVCL名とWindows Core AudioのFriendly Nameの語順が違ってもToken照合してFallback対象を特定する。",
+    "memo": "v0.18.4ではSpeaker/スピーカー等の表示言語依存語を照合Tokenから除外し、FxSound等の安定した識別TokenでWindows Core Audio Fallback対象を特定する。失敗時は利用可能デバイス名もログへ出す。",
     "helperPath": "tools\\AudioSwitcher.cs",
     "soundVolumeViewPath": "",
     "nircmdPath": "tools\\nircmdc.exe",
@@ -63,5 +63,5 @@
     "memo": "v0.18.2以降はGitHub Releasesのelectron-updater用Metadataで起動時に自動確認します。versionUrlは旧版互換用として残します。",
     "lastDownloadUrl": ""
   },
-  "appVersion": "0.18.3"
+  "appVersion": "0.18.4"
 }

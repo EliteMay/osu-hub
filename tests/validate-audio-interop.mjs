@@ -36,9 +36,13 @@ for (const marker of [
   'Get-AudioDeviceMatchScore',
   'Find-BestRenderDeviceMatch',
   'MATCHED_CORE_AUDIO',
+  'MATCH_TOKENS',
+  'AVAILABLE_DEVICES',
   'AUDIO_MATCH_SELF_TEST_OK',
-  "Speakers (FxSound Audio Enhancer)",
-  "FxSound Speakers"
+  'Localized Output (FxSound Audio Enhancer)',
+  'Speakers (Other Audio Enhancer)',
+  'FxSound Speakers',
+  "'speaker', 'speakers'"
 ]) {
   if (!fallbackScript.includes(marker)) fail(`switch_audio_device.ps1 is missing marker: ${marker}`);
 }
