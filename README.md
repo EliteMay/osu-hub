@@ -142,7 +142,7 @@ Importは `parse → validation → recovery snapshot → transaction write → 
 
 ## Desktop Tools
 
-現在の配布予定版:
+現在の配布版:
 
 ```text
 osu Setup Launcher v0.18.2
