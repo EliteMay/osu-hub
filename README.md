@@ -161,7 +161,11 @@ https://github.com/EliteMay/osu-hub/releases/latest
 既定はSoundVolumeCommandLine (`svcl.exe`) を使用します。
 
 ```text
-対象検索
+SVCL一覧からApplication音声セッションを除外
+→ Device Render Endpointだけを対象検索
+→ 完全なCommand-Line Friendly IDを最優先
+→ Generic Provider名ではActive Endpointを優先
+→ 同点候補なら安全のため停止
 → SVCL /SetDefault <target> all
 → DefaultRenderDevice / Multi / Comm を直接参照して確認
 → 旧CSV Default列Fallback
@@ -174,14 +178,17 @@ https://github.com/EliteMay/osu-hub/releases/latest
 → Multimedia default device IDを再取得して確認
 ```
 
-#### FxSound実機修正履歴
+#### 音声切替の実機修正履歴
 
 - v0.18.1: Core Audio `IMMDeviceCollection` IIDの誤りによる `E_NOINTERFACE` を修正
 - v0.18.3: `FxSound Speakers` と `Speakers (FxSound Audio Enhancer)` の語順差を吸収
 - v0.18.4: speaker / スピーカー等の表示言語依存語を識別Tokenから除外
 - v0.18.5: SVCLには存在するがCore Audio Active一覧に存在しないEndpointをState付きで診断。FxSound process起動、Disabled Endpointの `/Enable`、Active化待機を追加
+- v0.18.6: `High Definition Audio Device` 指定時に `High Definition Audio Device\Application\Firefox` を誤選択した実機ログを受け、Application Sessionを候補から除外。`\Device\...\Render` の実Endpointだけを選択し、同点候補は停止する
 
-v0.18.4実Windowsログでは、SVCLが `FxSound Speakers` を見つける一方、Core Audio Active一覧にはFxSoundが存在しませんでした。SVCL一覧はDisabled / Unpluggedも含む設定なのに対し、旧Core Audio FallbackはActiveのみを列挙していたためです。v0.18.5ではこのState差を明示的に扱います。
+v0.18.5実Windowsでは、FxSoundを対象にした場合に `音声出力を切り替えました: FxSound Speakers` とWindows Default Aliasの一致まで確認できました。これにより切替・read-back経路自体は実機成功が確認できました。一方、そのFxSoundはユーザーが本当に使いたい物理出力ではなく、以前導入した仮想デバイスでした。
+
+その後、実際に使いたい `スピーカー (High Definition Audio Device)` を指定する過程で、SVCL一覧に同じAudio Providerを使うFirefox Application Sessionが混在し、旧部分一致MatcherがFirefoxを選ぶ別問題が判明しました。v0.18.6ではDevice EndpointとApplication SessionをEntity Classで分離してから照合します。
 
 ### Auto Update v0.18.2+
 
@@ -231,6 +238,7 @@ PR:
 
 - Electron JavaScript構文確認
 - Audio COM IID / Endpoint state / Fallback regression check
+- Application Session除外 / Device Endpoint選択 regression check
 - PowerShell 5.1 parse
 - `AudioSwitcher.cs` compile
 - FxSound matcher Self Test
@@ -264,7 +272,7 @@ Pages ArtifactはWebファイルだけを公開し、Electron source、bat、Sup
 
 `tests/validate-web.mjs` ではVersion、Project Profile、Secret混入、Import Recovery、Supabase endpoint、Recent / Best、自動蓄積、Token更新Workflow、Windows Release / Auto Update導線、旧Cloudflare Runtime再混入などを検査します。
 
-`tests/validate-audio-interop.mjs` ではCore Audio COM IID、Endpoint state、FxSound readiness、Fallback検証経路の再発防止を行います。
+`tests/validate-audio-interop.mjs` ではCore Audio COM IID、Endpoint state、FxSound readiness、Application Session除外、Device Endpoint選択、同点時安全停止、Fallback検証経路の再発防止を行います。
 
 `tests/validate-auto-update.mjs` ではUpdater bootstrap、GitHub Provider、One-click flow、Release Metadata、manual fallbackを検査します。
 
@@ -283,6 +291,8 @@ Pages ArtifactはWebファイルだけを公開し、Electron source、bat、Sup
 - Setup.exe / Update Metadata生成成功前にReleaseを成功扱いしない
 - Auto Update失敗で現在VersionやuserDataを破壊しない
 - Windows固有処理を静的コード確認だけで成功扱いしない
+- Application音声セッションを既定の再生デバイスEndpointとして扱わない
+- 複数の音声候補が同じ強さで一致した場合に先頭候補へ勝手に切り替えない
 
 ## 未確認 / 今後
 
@@ -291,8 +301,8 @@ Pages ArtifactはWebファイルだけを公開し、Electron source、bat、Sup
 - Backup / Import / Rollback実ブラウザE2E
 - Recent 24時間より前を含む全履歴ページング同期
 - 同期済みResultsをAI Coachingへ直接選択する機能
-- Windows実機でv0.18.5のFxSound Endpoint Active化 / 既定出力切替確認
-- v0.18.4 → v0.18.5の実Windows One-click Update / Restart確認
+- Windows実機でv0.18.6の `High Definition Audio Device` → `スピーカー (High Definition Audio Device)` 選択 / 既定出力切替確認
+- v0.18.5 → v0.18.6の実Windows One-click Update / Restart確認
 - Auto Update後のuserData設定維持確認
 - Installer Code Signing
 - Root Electronの `package-lock.json` をdependency変更に合わせて生成・追跡する
