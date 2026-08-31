@@ -1,5 +1,5 @@
 {
-  "latestVersion": "0.18.8",
+  "latestVersion": "0.18.9",
   "downloadUrl": "https://github.com/EliteMay/osu-hub/releases/latest",
-  "releaseNotes": "v0.18.7実機で、推測した完全Endpoint IDが実際のSVCL IDと一致せず切替が止まるケースを確認。v0.18.8では完全IDが見つからない場合でも、ID内のAudio Provider部分へ安全にFallbackし、Applicationセッション除外後の唯一のActive Render Endpointを選択する。候補が同点なら従来どおり切替せず停止する。"
+  "releaseNotes": "v0.18.9では音声切替先の手入力を通常導線から外し、SVCLで検出した実際の再生デバイスを一覧から選べるようにする。表示は『スピーカー (High Definition Audio Device)』のような分かりやすい名前にし、内部では正確なEndpoint IDを保存する。詳細IDの手入力は上級者向けとして残す。"
 }

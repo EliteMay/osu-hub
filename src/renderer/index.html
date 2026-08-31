@@ -75,10 +75,24 @@
           </select>
         </label>
 
-        <label class="field audio-standard-field">
-          <span>切り替えたい音声名</span>
-          <input id="audioDeviceName" type="text" placeholder="例: High Definition Audio Device\Device\Speakers\Render">
-        </label>
+        <div class="field audio-standard-field">
+          <span>切り替え先</span>
+          <div class="device-picker-row">
+            <select id="audioDeviceSelect" aria-describedby="audioDevicePickerStatus">
+              <option value="">再生デバイスを検出中...</option>
+            </select>
+            <button id="audioRefreshButton" class="ghost-button compact-button" type="button">再検出</button>
+          </div>
+          <div id="audioDevicePickerStatus" class="device-picker-status" data-kind="info">Windowsの再生デバイスを確認します。</div>
+        </div>
+
+        <details class="advanced-audio audio-standard-field">
+          <summary>詳細なデバイスIDを確認・手入力</summary>
+          <label class="field">
+            <span>音声デバイスID</span>
+            <input id="audioDeviceName" type="text" placeholder="一覧から選ぶと自動入力されます">
+          </label>
+        </details>
 
         <label class="field audio-standard-field audio-script-field">
           <span>音声切替スクリプト</span>
@@ -101,11 +115,11 @@
         </label>
 
         <div class="hint-box">
-          SoundVolumeCommandLineモードを推奨します。入力名が一覧に実在しない場合は切替を実行せず、候補一覧をログに出します。まず「音声デバイス一覧」を押して、IDまたはNameをコピーしてください。
+          SoundVolumeCommandLineモードでは、検出した再生デバイスを一覧から選ぶだけで正確なEndpoint IDを保存します。Firefox等のアプリ音声セッションは候補から除外されます。手入力は通常不要です。
         </div>
 
         <div class="button-row small">
-          <button id="audioListButton" class="ghost-button" type="button">音声デバイス一覧</button>
+          <button id="audioListButton" class="ghost-button" type="button">詳細一覧をログ表示</button>
           <button id="audioTestButton" class="ghost-button" type="button">音声だけテスト</button>
           <button id="openToolsButton" class="ghost-button" type="button">toolsフォルダを開く</button>
           <button id="installSvclButton" class="secondary-button" type="button">SVCLを自動取得</button>
@@ -198,6 +212,7 @@
   </template>
 
   <script src="./app.js"></script>
+  <script src="./audio-picker.js"></script>
   <script src="./updater-status.js"></script>
 </body>
 </html>
