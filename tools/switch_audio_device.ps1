@@ -36,7 +36,15 @@ function Get-AudioTokens([string]$Value) {
   $normalized = Normalize-AudioText $Value
   if ([string]::IsNullOrWhiteSpace($normalized)) { return @() }
 
-  $stopWords = @('audio', 'device', 'render', 'default', 'endpoint', 'output', 'high', 'definition')
+  # Device class / role words differ by Windows display language and provider.
+  # They are intentionally ignored so a stable vendor/product token (for example
+  # "fxsound") can bridge "FxSound Speakers" and "スピーカー (FxSound Audio Enhancer)".
+  $stopWords = @(
+    'audio', 'device', 'render', 'default', 'endpoint', 'output', 'high', 'definition',
+    'speaker', 'speakers', 'headphone', 'headphones', 'headset', 'headsets',
+    'earphone', 'earphones', 'earbud', 'earbuds',
+    'スピーカー', 'ヘッドホン', 'ヘッドセット', 'イヤホン'
+  )
   $tokens = @()
   foreach ($token in ($normalized -split ' ')) {
     $item = $token.Trim()
@@ -127,16 +135,31 @@ function Find-BestRenderDeviceMatch {
 
 if ($SelfTest.IsPresent) {
   $fixtures = @(
-    [PSCustomObject]@{ Name = 'Speakers (FxSound Audio Enhancer)'; Id = '{0.0.0.00000000}.{FXSOUND}'; IsDefault = $false },
+    [PSCustomObject]@{ Name = 'スピーカー (FxSound Audio Enhancer)'; Id = '{0.0.0.00000000}.{FXSOUND-JA}'; IsDefault = $false },
+    [PSCustomObject]@{ Name = 'Speakers (FxSound Audio Enhancer)'; Id = '{0.0.0.00000000}.{FXSOUND-EN}'; IsDefault = $false },
     [PSCustomObject]@{ Name = '2- Arctis GameBuds'; Id = '{0.0.0.00000000}.{ARCTIS}'; IsDefault = $true }
   )
   $fixtureHint = 'FxSound Audio Enhancer\Device\FxSound Speakers\Render'
-  $fixtureMatch = Find-BestRenderDeviceMatch -Devices $fixtures -Expected 'FxSound Speakers' -Hint $fixtureHint
-  if ($null -eq $fixtureMatch -or $fixtureMatch.Name -ne 'Speakers (FxSound Audio Enhancer)') {
-    Write-Error 'AUDIO_MATCH_SELF_TEST_FAILED: FxSound word-order fixture did not resolve to the FxSound endpoint.'
+
+  $fixtureMatchJa = Find-BestRenderDeviceMatch -Devices $fixtures -Expected 'FxSound Speakers' -Hint ''
+  if ($null -eq $fixtureMatchJa -or $fixtureMatchJa.Name -ne 'スピーカー (FxSound Audio Enhancer)') {
+    Write-Error 'AUDIO_MATCH_SELF_TEST_FAILED: localized FxSound fixture did not resolve from FxSound Speakers.'
     exit 20
   }
-  Write-Output 'AUDIO_MATCH_SELF_TEST_OK: FxSound Speakers -> Speakers (FxSound Audio Enhancer)'
+
+  $fixtureMatchHint = Find-BestRenderDeviceMatch -Devices $fixtures -Expected 'unknown output' -Hint $fixtureHint
+  if ($null -eq $fixtureMatchHint -or -not $fixtureMatchHint.Name.Contains('FxSound Audio Enhancer')) {
+    Write-Error 'AUDIO_MATCH_SELF_TEST_FAILED: SVCL command-line hint did not resolve to an FxSound endpoint.'
+    exit 21
+  }
+
+  $negative = Find-BestRenderDeviceMatch -Devices @($fixtures[2]) -Expected 'FxSound Speakers' -Hint ''
+  if ($null -ne $negative) {
+    Write-Error 'AUDIO_MATCH_SELF_TEST_FAILED: FxSound query incorrectly matched an Arctis endpoint.'
+    exit 22
+  }
+
+  Write-Output 'AUDIO_MATCH_SELF_TEST_OK: FxSound Speakers -> localized FxSound Audio Enhancer endpoint'
   exit 0
 }
 
@@ -217,11 +240,13 @@ if ([string]::IsNullOrWhiteSpace($DeviceName)) {
 $matched = Find-BestRenderDeviceMatch -Devices $devices -Expected $DeviceName -Hint $DeviceHint
 
 if ($null -eq $matched) {
-  Write-Error ("Device not found: " + $DeviceName)
+  $queryTokens = ((Get-AudioTokens ($DeviceName + ' ' + $DeviceHint)) -join ', ')
+  $available = (($devices | ForEach-Object { $_.Name }) -join ' | ')
+  Write-Error ("Device not found: " + $DeviceName + "; MATCH_TOKENS=" + $queryTokens + "; AVAILABLE_DEVICES=" + $available)
   if (-not [string]::IsNullOrWhiteSpace($DeviceHint)) {
     Write-Output ("DEVICE_HINT: " + $DeviceHint)
   }
-  Write-Output ("MATCH_TOKENS: " + ((Get-AudioTokens ($DeviceName + ' ' + $DeviceHint)) -join ', '))
+  Write-Output ("MATCH_TOKENS: " + $queryTokens)
   Write-Output "AVAILABLE_DEVICES:"
   foreach ($device in $devices) {
     $prefix = "DEVICE"
@@ -232,6 +257,7 @@ if ($null -eq $matched) {
 }
 
 Write-Output ("MATCHED_CORE_AUDIO: " + $matched.Name)
+Write-Output ("MATCH_TOKENS: " + ((Get-AudioTokens ($DeviceName + ' ' + $DeviceHint)) -join ', '))
 
 try {
   [OsuSetupAudio.AudioSwitcher]::SetDefaultRenderDevice($matched.Id)
