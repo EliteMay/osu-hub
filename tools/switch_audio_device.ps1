@@ -134,7 +134,7 @@ function Find-BestRenderDeviceMatch {
 if ($SelfTest.IsPresent) {
   $fixtures = @(
     [PSCustomObject]@{ Name = 'Localized Output (FxSound Audio Enhancer)'; Id = '{0.0.0.00000000}.{FXSOUND-LOCALIZED}'; IsDefault = $false },
-    [PSCustomObject]@{ Name = 'Speakers (FxSound Audio Enhancer)'; Id = '{0.0.0.00000000}.{FXSOUND-EN}'; IsDefault = $false },
+    [PSCustomObject]@{ Name = 'Speakers (Other Audio Enhancer)'; Id = '{0.0.0.00000000}.{OTHER-EN}'; IsDefault = $false },
     [PSCustomObject]@{ Name = '2- Arctis GameBuds'; Id = '{0.0.0.00000000}.{ARCTIS}'; IsDefault = $true }
   )
   $fixtureHint = 'FxSound Audio Enhancer\Device\FxSound Speakers\Render'
