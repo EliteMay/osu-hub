@@ -3,30 +3,30 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="osu! API同期と手入力のプレイ結果を同じIndexedDBで管理するResults画面。">
+  <meta name="description" content="osu! API同期と手入力のプレイ結果を検索・比較・詳細確認するResults画面。">
   <title>Results | osu! Hub</title>
   <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="../css/workspace.css" data-workspace-styles>
 </head>
 <body data-page="results">
-<header class="topbar">
-  <a class="brand" href="../index.html"><span class="brand-mark">osu!</span><span>Hub</span></a>
-  <nav class="nav" aria-label="メインナビゲーション">
-    <a href="./account.html">Account Sync</a><a href="./coaching.html">AI Coach</a><a href="./results.html">Results</a><a href="./practice.html">Practice</a><a href="./stats.html">Stats</a><a href="./settings.html">Settings</a><a href="./tools.html">Desktop Tools</a>
-  </nav>
-</header>
+<header class="topbar"><a class="brand" href="../index.html"><span class="brand-mark">osu!</span><span>Hub</span></a><nav class="nav" aria-label="メインナビゲーション"><a href="../index.html">Dashboard</a><a class="active" aria-current="page" href="./results.html">Results</a><a href="./stats.html">Analysis</a><a href="./practice.html">Practice</a><a href="./coaching.html">Coaching</a><span class="nav-separator" aria-hidden="true"></span><a href="./tools.html">Tools</a><a href="./settings.html">Settings</a></nav></header>
 <main class="container">
-<section class="page-head">
-  <div><p class="eyebrow">performance log</p><h1>Results</h1><p class="lead">osu! APIから同期したプレイと手入力リザルトを同じ場所に保存し、成長と苦手傾向を比較する。</p></div>
-  <a class="button primary" href="./account.html">osu!から同期</a>
+<section class="page-head"><div><p class="eyebrow">performance log</p><h1>Results</h1><p class="lead">Recent / Best / 手入力を同じ履歴で確認し、検索・絞り込み・詳細メモからAnalysisへつなげます。</p></div><div class="actions"><a class="button primary" href="./account.html">osu!から同期</a><a class="button ghost" href="./stats.html">Analysisへ</a></div></section>
+<section class="metric-grid" aria-label="Results概要"><article class="metric"><span>Results</span><strong id="resultCount">0</strong><small>保存総数</small></article><article class="metric"><span>Shown</span><strong id="resultShownCount">0</strong><small>現在の絞り込み</small></article><article class="metric"><span>Average ACC</span><strong id="resultAvgAcc">--</strong><small>表示分</small></article><article class="metric"><span>Total Miss</span><strong id="resultTotalMiss">0</strong><small>表示分</small></article></section>
+<section class="panel flat">
+  <div class="panel-title"><div><p class="eyebrow">find results</p><h2>検索・Filter・Sort</h2></div></div>
+  <div class="filter-grid">
+    <div class="field"><label for="resultSearch">検索</label><input id="resultSearch" type="search" placeholder="譜面名 / Artist / MOD / メモ"></div>
+    <div class="field"><label for="resultSourceFilter">種類</label><select id="resultSourceFilter"><option value="all">すべて</option><option value="recent">Recent</option><option value="best">Best</option><option value="api">osu! API</option><option value="manual">手入力</option></select></div>
+    <div class="field"><label for="resultSort">並び順</label><select id="resultSort"><option value="date-desc">新しい順</option><option value="date-asc">古い順</option><option value="acc-desc">Accuracy高い順</option><option value="miss-asc">Miss少ない順</option><option value="pp-desc">PP高い順</option><option value="stars-desc">★高い順</option></select></div>
+    <div class="field"><label for="resultMinStars">★ 最小</label><input id="resultMinStars" type="number" min="0" max="100" step="0.1" placeholder="例 5.0"></div>
+    <div class="field"><label for="resultMaxStars">★ 最大</label><input id="resultMaxStars" type="number" min="0" max="100" step="0.1" placeholder="例 7.0"></div>
+  </div>
+  <div class="actions"><button id="clearResultFilters" class="button ghost small" type="button">条件をクリア</button></div>
 </section>
-<section class="metric-grid" aria-label="Results概要">
-  <article class="metric"><span>Results</span><strong id="resultCount">0</strong><small>登録数</small></article>
-  <article class="metric"><span>Average ACC</span><strong id="resultAvgAcc">--</strong><small>登録分の平均</small></article>
-  <article class="metric"><span>Total Miss</span><strong id="resultTotalMiss">0</strong><small>登録分の合計</small></article>
-  <article class="metric"><span>Storage</span><strong>Local</strong><small>IndexedDB</small></article>
-</section>
+<section class="panel"><div class="panel-title"><div><p class="eyebrow">history</p><h2>保存済みResults</h2></div><span class="muted">行を選ぶと詳細・メモを開けます</span></div><div id="resultList" class="list-empty">まだResultがありません。</div><div class="actions"><button id="resultLoadMore" class="button ghost hidden" type="button">さらに表示</button></div></section>
 <section class="panel">
-  <div class="panel-title"><div><p class="eyebrow">manual result</p><h2>手動でリザルトを記録</h2></div><a href="./account.html">自動同期はこちら →</a></div>
+  <div class="panel-title"><div><p class="eyebrow">manual result</p><h2>手動でResultを記録</h2></div><a href="./account.html">自動同期はこちら →</a></div>
   <form id="resultForm" class="form-grid three">
     <div class="field full"><label for="resultMapName">譜面名</label><input id="resultMapName" name="mapName" required placeholder="Artist - Title [Difficulty]"></div>
     <div class="field"><label for="resultDate">日付</label><input id="resultDate" name="date" type="date"></div>
@@ -37,13 +37,13 @@
     <div class="field"><label for="resultPp">PP</label><input id="resultPp" name="pp" type="number" min="0" step="0.1" placeholder="185.4"></div>
     <div class="field"><label for="resultStars">★</label><input id="resultStars" name="stars" type="number" min="0" step="0.01" placeholder="6.25"></div>
     <div class="field"><label for="resultBpm">BPM</label><input id="resultBpm" name="bpm" type="number" min="0" step="1" placeholder="210"></div>
-    <div class="field"><label for="resultNote">メモ</label><input id="resultNote" name="note" placeholder="後半で崩れた"></div>
+    <div class="field full"><label for="resultNote">メモ</label><input id="resultNote" name="note" placeholder="後半で崩れた"></div>
     <div class="field full"><div class="actions"><button class="button primary" type="submit">保存</button></div></div>
   </form>
 </section>
-<section class="panel"><div class="panel-title"><div><p class="eyebrow">history</p><h2>保存済みリザルト</h2></div><a href="./stats.html">統計を見る →</a></div><div id="resultList" class="list-empty">まだリザルトがありません。Account Syncまたは手動入力から追加できます。</div></section>
 </main>
-<footer class="footer"><span>osu! Hub <strong data-site-version></strong></span><span>API同期データと手入力データは同じIndexedDBへ保存します。</span></footer>
-<script src="../js/storage.js"></script><script src="../js/app.js"></script><script src="../js/site-meta.js"></script>
+<dialog id="resultDetailDialog" class="app-dialog"><div class="dialog-body"><div class="dialog-head"><div><p class="eyebrow">result detail</p><h2 id="resultDetailTitle">Result Detail</h2><p id="resultDetailMeta" class="muted"></p></div><button id="closeResultDetail" class="button small ghost" type="button">閉じる</button></div><div id="resultDetailStats" class="detail-stat-grid"></div><div class="field"><label for="resultMemo">手動メモ</label><textarea id="resultMemo" placeholder="崩れた場所、感覚、次回意識すること"></textarea></div><div class="actions"><button id="saveResultMemo" class="button primary" type="button">メモを保存</button><a id="resultBeatmapLink" class="button ghost hidden" href="#" target="_blank" rel="noopener noreferrer">Beatmapを開く</a><button id="deleteResult" class="button danger" type="button">このResultを削除</button></div></div></dialog>
+<footer class="footer"><span>osu! Hub <strong data-site-version></strong></span><span>API同期時も手動メモを維持します。</span></footer>
+<script src="../js/storage.js"></script><script src="../js/workspace.js"></script><script src="../js/results-mvp.js"></script><script src="../js/site-meta.js"></script>
 </body>
 </html>
