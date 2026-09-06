@@ -6,130 +6,37 @@
   <meta name="description" content="osu! API v2からRecent Plays（直近24時間）とBest Scoresを取得し、osu! Hubへ重複なく蓄積するAccount Sync設定。">
   <title>Account Sync | osu! Hub</title>
   <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="../css/workspace.css" data-workspace-styles>
 </head>
 <body data-page="account">
-<header class="topbar">
-  <a class="brand" href="../index.html"><span class="brand-mark">osu!</span><span>Hub</span></a>
-  <nav class="nav" aria-label="メインナビゲーション">
-    <a href="./account.html" class="active">Account Sync</a>
-    <a href="./coaching.html">AI Coach</a>
-    <a href="./results.html">Results</a>
-    <a href="./practice.html">Practice</a>
-    <a href="./stats.html">Stats</a>
-    <a href="./settings.html">Settings</a>
-    <a href="./tools.html">Desktop Tools</a>
-  </nav>
-</header>
-
+<header class="topbar"><a class="brand" href="../index.html"><span class="brand-mark">osu!</span><span>Hub</span></a><nav class="nav" aria-label="メインナビゲーション"><a href="../index.html">Dashboard</a><a href="./results.html">Results</a><a href="./stats.html">Analysis</a><a href="./practice.html">Practice</a><a href="./coaching.html">Coaching</a><span class="nav-separator" aria-hidden="true"></span><a href="./tools.html">Tools</a><a href="./settings.html">Settings</a></nav></header>
 <main class="container">
-  <section class="page-head">
-    <div>
-      <p class="eyebrow">osu! api sync</p>
-      <h1>Account Sync</h1>
-      <p class="lead">Supabase Edge Function経由でosu! API v2からRecent Plays（直近24時間）とBest Scoresを取得し、同じScore IDを重複させずResultsへ蓄積する。ブラウザへosu! Client ID / Client Secretを入力する必要はありません。</p>
-    </div>
-  </section>
-
-  <section class="metric-grid" aria-label="同期概要">
-    <article class="metric"><span>Saved Account</span><strong id="savedAccount">--</strong><small>現在の同期対象</small></article>
-    <article class="metric"><span>Fetched</span><strong id="fetchedCount">0</strong><small>今回取得</small></article>
-    <article class="metric"><span>Added</span><strong id="addedCount">0</strong><small>新規Results</small></article>
-    <article class="metric"><span>Updated</span><strong id="updatedCount">0</strong><small>既存スコア更新</small></article>
-  </section>
-
-  <div class="split">
-    <section class="panel flat">
-      <div class="panel-title"><div><p class="eyebrow">connection</p><h2>同期設定</h2></div></div>
-      <form id="accountForm" class="form-grid">
-        <div class="field full">
-          <label for="endpointUrl">Supabase Sync API URL</label>
-          <input id="endpointUrl" name="endpointUrl" type="url" inputmode="url" placeholder="https://xxxx.supabase.co/functions/v1/osu-sync" aria-describedby="endpointHelp">
-          <small id="endpointHelp" class="muted">通常は変更不要。接続先はdata/site.jsonの本番設定を使います。</small>
-        </div>
-        <div class="field">
-          <label for="osuUser">osu! User ID / ユーザー名</label>
-          <input id="osuUser" name="user" autocomplete="off" placeholder="12345678 または username">
-        </div>
-        <div class="field">
-          <label for="osuMode">Ruleset</label>
-          <select id="osuMode" name="mode">
-            <option value="osu">osu!standard</option>
-            <option value="taiko">osu!taiko</option>
-            <option value="fruits">osu!catch</option>
-            <option value="mania">osu!mania</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="scoreType">同期対象</label>
-          <select id="scoreType" name="scoreType" aria-describedby="scoreTypeHelp">
-            <option value="recent">Recent Plays (24h)</option>
-            <option value="best">Best Scores</option>
-          </select>
-          <small id="scoreTypeHelp" class="muted">Recent Playsは直近24時間です。</small>
-        </div>
-        <div class="field">
-          <label for="syncLimit">1回の取得件数</label>
-          <input id="syncLimit" name="limit" type="number" min="1" max="100" step="1" value="100">
-        </div>
-        <div class="field">
-          <label for="includeFails">Failしたプレイ</label>
-          <select id="includeFails" name="includeFails" aria-describedby="includeFailsHelp">
-            <option value="1">含める</option>
-            <option value="0">含めない</option>
-          </select>
-          <small id="includeFailsHelp" class="muted">Recent Playsだけに適用します。</small>
-        </div>
-        <div class="field">
-          <label for="autoSyncOnOpen">自動蓄積</label>
-          <select id="autoSyncOnOpen" name="autoSyncOnOpen" aria-describedby="autoSyncHelp">
-            <option value="1">有効</option>
-            <option value="0">無効</option>
-          </select>
-          <small id="autoSyncHelp" class="muted">Account Syncを開いている間、Recentを一定間隔で自動同期します。</small>
-        </div>
-        <div class="field full">
-          <div class="notice"><strong>蓄積方式</strong><br>Recentは新しいScore IDだけ追加し、同じスコアは更新します。Bestから取得した古い自己ベストも同じResultsへ統合されるため、同期を重ねても重複は増えません。</div>
-        </div>
-        <div class="field full">
-          <div class="actions">
-            <button class="button ghost" type="submit">設定を保存</button>
-            <button id="testService" class="button ghost" type="button">接続テスト</button>
-            <button id="syncNow" class="button primary" type="button">Recentを同期</button>
-          </div>
-        </div>
-      </form>
-      <div id="syncStatus" class="notice" role="status" aria-live="polite" style="margin-top:18px">Recent Playsは直近24時間、Best Scoresは上位100件まで取得できます。</div>
-    </section>
-
-    <aside class="stack">
-      <section class="panel flat">
-        <p class="eyebrow">account</p>
-        <h2 id="accountName">--</h2>
-        <img id="accountAvatar" class="account-avatar hidden" alt="osu! avatar">
-        <div class="data-list">
-          <div class="practice-card"><span>PP</span><div><strong id="accountPp">--</strong><small>Performance Points</small></div><span></span></div>
-          <div class="practice-card"><span>Rank</span><div><strong id="accountRank">--</strong><small>Global Rank</small></div><span></span></div>
-          <div class="practice-card"><span>ACC</span><div><strong id="accountAcc">--</strong><small>Profile Accuracy</small></div><span></span></div>
-          <div class="practice-card"><span>Sync</span><div><strong id="lastSync">--</strong><small>最終同期</small></div><span></span></div>
-          <div class="practice-card"><span>Recent</span><div><strong id="lastRecentSync">--</strong><small>最終Recent同期</small></div><span></span></div>
-          <div class="practice-card"><span>Best</span><div><strong id="lastBestSync">--</strong><small>最終Best同期</small></div><span></span></div>
-        </div>
-      </section>
-      <section class="panel flat">
-        <div class="notice"><strong>ブラウザへのosu! Secret入力は不要</strong><br>Client ID / Client SecretはGitHub Actions内だけで使い、Supabaseには短期Access Tokenだけを保存します。このWeb画面へ秘密情報を入力・保存することはありません。</div>
-      </section>
-    </aside>
-  </div>
-
-  <section class="panel">
-    <div class="panel-title"><div><p class="eyebrow">latest sync</p><h2 id="previewTitle">今回取得したリザルト</h2></div><a href="./results.html">Resultsで見る →</a></div>
-    <div id="syncPreview" class="list-empty">まだ同期していません。RecentまたはBestを選んで同期してください。</div>
-  </section>
+<section class="page-head"><div><p class="eyebrow">secondary surface / osu! api sync</p><h1>Account Sync</h1><p class="lead">Supabase Edge Function経由でosu! API v2からRecent Plays（直近24時間）とBest Scoresを取得し、同じScore IDを重複させずResultsへ蓄積します。ブラウザへosu! Client ID / Client Secretを入力する必要はありません。</p></div><a class="button ghost" href="../index.html">Dashboardへ戻る</a></section>
+<section class="metric-grid" aria-label="同期概要"><article class="metric"><span>Saved Account</span><strong id="savedAccount">--</strong><small>現在の同期対象</small></article><article class="metric"><span>Fetched</span><strong id="fetchedCount">0</strong><small>今回取得</small></article><article class="metric"><span>Added</span><strong id="addedCount">0</strong><small>新規Results</small></article><article class="metric"><span>Updated</span><strong id="updatedCount">0</strong><small>既存スコア更新</small></article></section>
+<div class="split">
+<section class="panel flat">
+  <div class="panel-title"><div><p class="eyebrow">connection</p><h2>同期設定</h2></div></div>
+  <form id="accountForm" class="form-grid">
+    <div class="field full"><label for="endpointUrl">Supabase Sync API URL</label><input id="endpointUrl" name="endpointUrl" type="url" inputmode="url" placeholder="https://xxxx.supabase.co/functions/v1/osu-sync" aria-describedby="endpointHelp"><small id="endpointHelp" class="muted">通常は変更不要。接続先はdata/site.jsonの本番設定を使います。</small></div>
+    <div class="field"><label for="osuUser">osu! User ID / ユーザー名</label><input id="osuUser" name="user" autocomplete="off" placeholder="12345678 または username"></div>
+    <div class="field"><label for="osuMode">Ruleset</label><select id="osuMode" name="mode"><option value="osu">osu!standard</option><option value="taiko">osu!taiko</option><option value="fruits">osu!catch</option><option value="mania">osu!mania</option></select></div>
+    <div class="field"><label for="scoreType">同期対象</label><select id="scoreType" name="scoreType" aria-describedby="scoreTypeHelp"><option value="recent">Recent Plays (24h)</option><option value="best">Best Scores</option></select><small id="scoreTypeHelp" class="muted">Recent Playsは直近24時間です。</small></div>
+    <div class="field"><label for="syncLimit">1回の取得件数</label><input id="syncLimit" name="limit" type="number" min="1" max="100" step="1" value="100"></div>
+    <div class="field"><label for="includeFails">Failしたプレイ</label><select id="includeFails" name="includeFails" aria-describedby="includeFailsHelp"><option value="1">含める</option><option value="0">含めない</option></select><small id="includeFailsHelp" class="muted">Recent Playsだけに適用します。</small></div>
+    <div class="field"><label for="autoSyncOnOpen">自動蓄積</label><select id="autoSyncOnOpen" name="autoSyncOnOpen" aria-describedby="autoSyncHelp"><option value="1">有効</option><option value="0">無効</option></select><small id="autoSyncHelp" class="muted">Account Syncを開いている間、Recentを一定間隔で自動同期します。</small></div>
+    <div class="field full"><div class="notice"><strong>蓄積方式</strong><br>Recentは新しいScore IDだけ追加し、同じスコアは更新します。Bestから取得した古い自己ベストも同じResultsへ統合されるため、同期を重ねても重複は増えません。API Resultへ付けた手動メモも維持します。</div></div>
+    <div class="field full"><div class="actions"><button class="button ghost" type="submit">設定を保存</button><button id="testService" class="button ghost" type="button">接続テスト</button><button id="syncNow" class="button primary" type="button">Recentを同期</button></div></div>
+  </form>
+  <div id="syncStatus" class="notice" role="status" aria-live="polite" style="margin-top:18px">Recent Playsは直近24時間、Best Scoresは上位100件まで取得できます。</div>
+</section>
+<aside class="stack">
+  <section class="panel flat"><p class="eyebrow">account</p><h2 id="accountName">--</h2><img id="accountAvatar" class="account-avatar hidden" alt="osu! avatar"><div class="data-list"><div class="practice-card"><span>PP</span><div><strong id="accountPp">--</strong><small>Performance Points</small></div><span></span></div><div class="practice-card"><span>Rank</span><div><strong id="accountRank">--</strong><small>Global Rank</small></div><span></span></div><div class="practice-card"><span>ACC</span><div><strong id="accountAcc">--</strong><small>Profile Accuracy</small></div><span></span></div><div class="practice-card"><span>Sync</span><div><strong id="lastSync">--</strong><small>最終同期</small></div><span></span></div><div class="practice-card"><span>Recent</span><div><strong id="lastRecentSync">--</strong><small>最終Recent同期</small></div><span></span></div><div class="practice-card"><span>Best</span><div><strong id="lastBestSync">--</strong><small>最終Best同期</small></div><span></span></div></div></section>
+  <section class="panel flat"><div class="notice"><strong>ブラウザへのosu! Secret入力は不要</strong><br>Client ID / Client SecretはGitHub Actions内だけで使い、Supabaseには短期Access Tokenだけを保存します。このWeb画面へ秘密情報を入力・保存することはありません。</div></section>
+</aside>
+</div>
+<section class="panel"><div class="panel-title"><div><p class="eyebrow">latest sync</p><h2 id="previewTitle">今回取得したリザルト</h2></div><a href="./results.html">Resultsで見る →</a></div><div id="syncPreview" class="list-empty">まだ同期していません。RecentまたはBestを選んで同期してください。</div></section>
 </main>
-
 <footer class="footer"><span>osu! Hub <strong data-site-version></strong></span><span>Public osu! data via API v2. Browser secrets are not required.</span></footer>
-<script src="../js/storage.js"></script>
-<script src="../js/osu-sync.js"></script>
-<script src="../js/site-meta.js"></script>
+<script src="../js/storage.js"></script><script src="../js/osu-sync.js"></script><script src="../js/site-meta.js"></script>
 </body>
 </html>
