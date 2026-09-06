@@ -17,11 +17,12 @@ const desktopPackage = json('package.json');
 const desktopUpdate = json('version.json');
 
 if (!/^\d+\.\d+\.\d+$/.test(String(site.siteVersion || ''))) fail('data/site.json siteVersion must use x.y.z format.');
-if (projectMeta.guideVersion !== '1.6.0') fail(`project-meta.json guideVersion must be 1.6.0 (actual: ${projectMeta.guideVersion}).`);
+if (!/^\d+\.\d+\.\d+$/.test(String(projectMeta.guideVersion || ''))) fail('project-meta.json guideVersion must use x.y.z format.');
 for (const profile of ['STATIC', 'DATA', 'AI-HANDOFF', 'CLOUD', 'ELECTRON', 'TOOL']) {
   if (!projectMeta.profiles?.includes(profile)) fail(`project-meta.json is missing profile: ${profile}`);
 }
 if (projectMeta.sourcesOfTruth?.webVersion !== 'data/site.json#siteVersion') fail('Web version Source of Truth must be data/site.json#siteVersion.');
+if (projectMeta.sourcesOfTruth?.webStorageSchema !== 'js/storage.js#SCHEMA_VERSION') fail('Web storage schema Source of Truth must be js/storage.js#SCHEMA_VERSION.');
 if (projectMeta.runtimePolicy?.stablePaths !== true || projectMeta.runtimePolicy?.versionedRuntimeFolders !== false) fail('project-meta.json must declare stable runtime paths and no versioned runtime folders.');
 if (projectMeta.runtimePolicy?.rendererOwnsDom !== true) fail('project-meta.json must record Renderer owns its DOM policy.');
 if (desktopPackage.version !== desktopUpdate.latestVersion || desktopPackage.version !== site.launcher?.version) {
@@ -80,6 +81,7 @@ const css = read('css/styles.css');
 if (/\.nav\s*\{[^}]*display\s*:\s*none/is.test(css)) fail('Navigation must not disappear on small screens.');
 if (!/:focus-visible/.test(css)) fail('styles.css must provide focus-visible styling.');
 if (!/@media\s*\(prefers-reduced-motion\s*:\s*reduce\)/.test(css)) fail('styles.css must respect prefers-reduced-motion.');
+if (!fs.existsSync(path.join(root, 'css/workspace.css'))) fail('MVP workspace stylesheet must exist.');
 
 const webJsFiles = fs.readdirSync(path.join(root, 'js')).filter((name) => name.endsWith('.js')).map((name) => `js/${name}`);
 for (const file of webJsFiles) {
@@ -94,10 +96,40 @@ for (const dir of ['js', 'css']) {
 }
 
 const storageSource = read('js/storage.js');
-for (const marker of ['recoverySnapshot', 'verifyImported', 'replaceAllStores', 'Rollback']) {
-  if (!storageSource.includes(marker)) fail(`js/storage.js: missing import recovery marker ${marker}.`);
+for (const marker of ['recoverySnapshot', 'verifyImported', 'replaceAllStores', 'Rollback', 'migrateImportPayload', 'normalizePracticeRecord']) {
+  if (!storageSource.includes(marker)) fail(`js/storage.js: missing storage guard ${marker}.`);
 }
-if (!/const\s+SCHEMA_VERSION\s*=\s*1\b/.test(storageSource)) fail('js/storage.js: SCHEMA_VERSION must be explicit.');
+if (!/const\s+DB_VERSION\s*=\s*2\b/.test(storageSource)) fail('js/storage.js: DB_VERSION must be 2 for sessions migration.');
+if (!/const\s+SCHEMA_VERSION\s*=\s*2\b/.test(storageSource)) fail('js/storage.js: SCHEMA_VERSION must be 2.');
+if (!/STORES\s*=\s*\[[^\]]*['"]sessions['"]/s.test(storageSource)) fail('js/storage.js: sessions store must exist.');
+if (!/\[1,\s*2\]\.includes\(version\)/.test(storageSource)) fail('js/storage.js: schema v1 backups must remain importable.');
+
+for (const file of ['js/workspace.js', 'js/dashboard.js', 'js/results-mvp.js', 'js/analysis.js', 'js/practice-mvp.js', 'js/coaching-bridge.js']) {
+  if (!fs.existsSync(path.join(root, file))) fail(`${file}: MVP runtime file is missing.`);
+}
+const workspaceSource = read('js/workspace.js');
+for (const marker of ['buildSessions', 'growth', 'difficulty', 'stability', 'sessionAnalysis']) {
+  if (!workspaceSource.includes(marker)) fail(`js/workspace.js: missing analysis contract ${marker}.`);
+}
+const resultsSource = read('js/results-mvp.js');
+for (const marker of ['resultSearch', 'resultSourceFilter', 'resultSort', 'saveResultMemo', 'resultLoadMore']) {
+  if (!resultsSource.includes(marker)) fail(`js/results-mvp.js: missing Results MVP contract ${marker}.`);
+}
+const practiceSource = read('js/practice-mvp.js');
+for (const marker of ["status:'active'", "status:'completed'", 'before:', 'after:', 'linkedAnalysis']) {
+  if (!practiceSource.includes(marker)) fail(`js/practice-mvp.js: missing Practice lifecycle contract ${marker}.`);
+}
+const coachingBridgeSource = read('js/coaching-bridge.js');
+if (!/Practiceで確認/.test(coachingBridgeSource) || !/from:\s*'analysis'/.test(coachingBridgeSource)) fail('Coaching must hand AI suggestions to Practice for user confirmation.');
+
+const primaryPages = ['index.html', 'pages/results.html', 'pages/stats.html', 'pages/practice.html', 'pages/coaching.html'];
+for (const file of primaryPages) {
+  const source = read(file);
+  for (const label of ['Dashboard', 'Results', 'Analysis', 'Practice', 'Coaching']) {
+    if (!source.includes(`>${label}<`)) fail(`${file}: primary navigation is missing ${label}.`);
+  }
+}
+if (!/data-page=["']stats["']/.test(read('pages/stats.html')) || !/<h1>Analysis<\/h1>/.test(read('pages/stats.html'))) fail('pages/stats.html must serve the Analysis surface.');
 
 const accountSyncSource = read('js/osu-sync.js');
 for (const marker of ['endpointUrl', 'serviceFetch', "action: 'health'", "action: 'sync'", 'supabase-edge-function', 'browserOAuthRequired', 'scoreType', 'autoSyncOnOpen', 'lastRecentSyncAt', 'lastBestSyncAt', 'syncKinds']) {
@@ -131,6 +163,7 @@ if (/CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCOUNT_ID|wrangler-action/.test(refreshWor
 const checkWorkflow = read('.github/workflows/check-web.yml');
 if (!/\.github\/workflows\/refresh-osu-token\.yml/.test(checkWorkflow)) fail('Check web path filters must include refresh-osu-token.yml.');
 if (!/supabase\/functions\/\*\*/.test(checkWorkflow)) fail('Check web path filters must include supabase/functions/**.');
+if (!/validate-storage-migration\.mjs/.test(checkWorkflow)) fail('Check web workflow must run storage migration regression validation.');
 
 if (!fs.existsSync(path.join(root, '.github/workflows/build-windows.yml'))) fail('Windows build/release workflow must exist.');
 const windowsWorkflow = fs.existsSync(path.join(root, '.github/workflows/build-windows.yml')) ? read('.github/workflows/build-windows.yml') : '';
@@ -182,4 +215,4 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log(`Validated ${htmlFiles.length} HTML files, project metadata, versions, launcher release/audio/auto-update guards, Recent/Best Supabase Account Sync guards, auto accumulation, token refresh policy, stable runtime paths, import recovery guards, and responsive/accessibility/security rules: OK`);
+console.log(`Validated ${htmlFiles.length} HTML files, project metadata, web schema v2, Dashboard/Results/Analysis/Practice/Coaching contracts, Supabase sync guards, Electron release guards, responsive/accessibility/security rules, and migration CI wiring: OK`);
