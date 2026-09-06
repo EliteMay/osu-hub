@@ -3,24 +3,22 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="osu! Hubに保存したResultsからAccuracy、Miss、PP、MOD別傾向を確認するStats画面。">
-  <title>Stats | osu! Hub</title>
-  <link rel="stylesheet" href="../css/styles.css">
+  <meta name="description" content="osu! HubのResultsから成長推移、難易度別、安定性、Session比較を確認するAnalysis画面。">
+  <title>Analysis | osu! Hub</title>
+  <link rel="stylesheet" href="../css/styles.css"><link rel="stylesheet" href="../css/workspace.css" data-workspace-styles>
 </head>
 <body data-page="stats">
-<header class="topbar">
-  <a class="brand" href="../index.html"><span class="brand-mark">osu!</span><span>Hub</span></a>
-  <nav class="nav" aria-label="メインナビゲーション"><a href="./account.html">Account Sync</a><a href="./coaching.html">AI Coach</a><a href="./results.html">Results</a><a href="./practice.html">Practice</a><a href="./stats.html">Stats</a><a href="./settings.html">Settings</a><a href="./tools.html">Desktop Tools</a></nav>
-</header>
+<header class="topbar"><a class="brand" href="../index.html"><span class="brand-mark">osu!</span><span>Hub</span></a><nav class="nav" aria-label="メインナビゲーション"><a href="../index.html">Dashboard</a><a href="./results.html">Results</a><a class="active" aria-current="page" href="./stats.html">Analysis</a><a href="./practice.html">Practice</a><a href="./coaching.html">Coaching</a><span class="nav-separator" aria-hidden="true"></span><a href="./tools.html">Tools</a><a href="./settings.html">Settings</a></nav></header>
 <main class="container">
-<section class="page-head"><div><p class="eyebrow">progress</p><h1>Stats</h1><p class="lead">手入力とosu! API同期のResultsをまとめて、成長の変化を軽量に確認。</p></div><a class="button ghost" href="./account.html">最新リザルトを同期</a></section>
-<section class="metric-grid" aria-label="統計概要"><article class="metric"><span>Results</span><strong id="statsResultCount">0</strong><small>分析対象</small></article><article class="metric"><span>Average ACC</span><strong id="statsAvgAcc">--</strong><small>全登録分</small></article><article class="metric"><span>Average Miss</span><strong id="statsAvgMiss">--</strong><small>1プレイ平均</small></article><article class="metric"><span>Best PP</span><strong id="statsBestPP">--</strong><small>登録分の最高</small></article></section>
-<div id="statsEmpty" class="notice hidden" role="status">統計を表示するにはResultsを追加するかAccount Syncを実行してください。</div>
-<section class="panel"><div class="panel-title"><div><p class="eyebrow">recent accuracy</p><h2>直近20件のAccuracy</h2></div></div><div id="accChart" class="chart" aria-label="直近Accuracy一覧"></div></section>
-<section class="panel"><div class="panel-title"><div><p class="eyebrow">mods</p><h2>MOD別</h2></div></div><div id="modStats" class="data-list"></div></section>
-<section class="panel flat"><p class="eyebrow">planned</p><h2>開発予定の分析</h2><p class="muted">以下はまだ統計ロジック未実装です。</p><div class="pill-list"><span class="pill">BPM別ACC</span><span class="pill">★別Miss</span><span class="pill">Session比較</span><span class="pill">Aim / Stream分類</span><span class="pill">PP推移</span><span class="pill">AI Coach履歴との比較</span></div></section>
+<section class="page-head"><div><p class="eyebrow">performance analysis</p><h1>Analysis</h1><p class="lead">数字を並べるだけでなく、成長・難易度・安定性・Sessionの4方向から「次に何を練習するか」を判断します。</p></div><div class="field"><label for="analysisPeriod">分析期間</label><select id="analysisPeriod"><option value="7">直近7日</option><option value="30" selected>直近30日</option><option value="all">全期間</option></select></div></section>
+<section class="metric-grid" aria-label="Analysis概要"><article class="metric"><span>Results</span><strong id="analysisResultCount">0</strong><small>期間内</small></article><article class="metric"><span>Average ACC</span><strong id="analysisAvgAcc">--</strong><small>期間内</small></article><article class="metric"><span>Average Miss</span><strong id="analysisAvgMiss">--</strong><small>1プレイ平均</small></article><article class="metric"><span>Sessions</span><strong id="analysisSessionCount">0</strong><small>自動推定</small></article></section>
+<div id="analysisInsufficient" class="notice hidden" role="status">Resultが少ないため断定的な分析は行いません。もう少しプレイを蓄積してください。</div>
+<section class="panel"><div class="panel-title"><div><p class="eyebrow">1 / growth</p><h2>成長推移</h2></div><a href="./results.html">Resultsを確認 →</a></div><div id="growthAnalysis" class="list-empty">計算中です。</div></section>
+<section class="panel"><div class="panel-title"><div><p class="eyebrow">2 / difficulty</p><h2>難易度別</h2></div></div><div id="difficultyAnalysis" class="list-empty">計算中です。</div></section>
+<section class="panel"><div class="panel-title"><div><p class="eyebrow">3 / stability</p><h2>安定性</h2></div></div><div id="stabilityAnalysis" class="list-empty">計算中です。</div></section>
+<section class="panel"><div class="panel-title"><div><p class="eyebrow">4 / sessions</p><h2>Session比較</h2></div><span class="muted">45分以上空いたら別Sessionとして初期推定</span></div><div id="sessionAnalysis" class="list-empty">計算中です。</div></section>
 </main>
-<footer class="footer"><span>osu! Hub <strong data-site-version></strong></span><span>外部チャートライブラリなし。</span></footer>
-<script src="../js/storage.js"></script><script src="../js/app.js"></script><script src="../js/site-meta.js"></script>
+<footer class="footer"><span>osu! Hub <strong data-site-version></strong></span><span>AnalysisはResults / Sessionsから都度計算します。</span></footer>
+<script src="../js/storage.js"></script><script src="../js/workspace.js"></script><script src="../js/analysis.js"></script><script src="../js/site-meta.js"></script>
 </body>
 </html>
