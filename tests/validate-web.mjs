@@ -108,7 +108,7 @@ for (const file of ['js/workspace.js', 'js/dashboard.js', 'js/results-mvp.js', '
   if (!fs.existsSync(path.join(root, file))) fail(`${file}: MVP runtime file is missing.`);
 }
 const workspaceSource = read('js/workspace.js');
-for (const marker of ['buildSessions', 'growth', 'difficulty', 'stability', 'sessionAnalysis']) {
+for (const marker of ['ensureSessions', 'compareRecent', 'difficultyGroups', 'difficultyInsight', 'sessionInsight']) {
   if (!workspaceSource.includes(marker)) fail(`js/workspace.js: missing analysis contract ${marker}.`);
 }
 const resultsSource = read('js/results-mvp.js');
