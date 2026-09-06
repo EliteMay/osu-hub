@@ -134,7 +134,7 @@ jobs:
           Write-Host "Auto-update metadata verified: latest.yml + $([IO.Path]::GetFileName($blockmap))"
 
       - name: Upload installer artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: osu-setup-launcher-windows
           path: |
