@@ -56,12 +56,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Check JavaScript syntax
+        shell: bash
         run: |
-          node --check js/storage.js
-          node --check js/app.js
-          node --check js/osu-sync.js
-          node --check js/site-meta.js
-          node --check tests/validate-web.mjs
+          for file in js/*.js; do node --check "$file"; done
+          for file in tests/*.mjs; do node --check "$file"; done
 
       - name: Check JSON
         run: |
@@ -73,6 +71,9 @@ jobs:
 
       - name: Validate web project
         run: node tests/validate-web.mjs
+
+      - name: Validate storage migration
+        run: node tests/validate-storage-migration.mjs
 
       - name: Check tracked secret files
         shell: bash

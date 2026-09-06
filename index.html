@@ -4,81 +4,49 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b0b0f">
-  <meta name="description" content="osu!のリザルト同期、AIコーチング、練習管理、統計、設定、Desktop Toolsをまとめた個人向けHub。">
-  <title>osu! Hub</title>
+  <meta name="description" content="osu!の同期、Results分析、Practice、AI Coachingをつなげる個人向け改善Dashboard。">
+  <title>Dashboard | osu! Hub</title>
   <link rel="stylesheet" href="./css/styles.css">
+  <link rel="stylesheet" href="./css/workspace.css" data-workspace-styles>
 </head>
 <body data-page="home">
-  <header class="topbar">
-    <a class="brand" href="./index.html"><span class="brand-mark">osu!</span><span>Hub</span></a>
-    <nav class="nav" aria-label="メインナビゲーション">
-      <a href="./pages/account.html">Account Sync</a>
-      <a href="./pages/coaching.html">AI Coach</a>
-      <a href="./pages/results.html">Results</a>
-      <a href="./pages/practice.html">Practice</a>
-      <a href="./pages/stats.html">Stats</a>
-      <a href="./pages/settings.html">Settings</a>
-      <a href="./pages/tools.html">Desktop Tools</a>
-    </nav>
-  </header>
-
-  <main class="container">
-    <section class="hero">
-      <div>
-        <p class="eyebrow">performance workspace</p>
-        <h1>osu!の記録と改善を、1つのワークスペースに。</h1>
-        <p class="lead">Recent / Bestの同期、リザルト比較、AIコーチング、練習管理、プレイヤー設定、Windows環境の準備まで。プレイ前後の作業をページ移動で迷わない形にまとめます。</p>
-        <div class="hero-actions">
-          <a class="button primary" href="./pages/account.html">プレイ結果を同期</a>
-          <a class="button ghost" href="./pages/coaching.html">AIコーチを開く</a>
-        </div>
-      </div>
-      <div class="hero-panel">
-        <div class="status-dot" aria-hidden="true"></div>
-        <strong>Local-first / Supabase relay</strong>
-        <p>Results・Coaching・PracticeはブラウザのIndexedDBへ保存。osu! APIへの接続はSupabase Edge Functionを経由し、Client Secretをブラウザへ置きません。</p>
-        <div class="hero-meta" aria-label="構成">
-          <span>IndexedDB</span><span>osu! API v2</span><span>Desktop Launcher</span>
-        </div>
-      </div>
+<header class="topbar">
+  <a class="brand" href="./index.html"><span class="brand-mark">osu!</span><span>Hub</span></a>
+  <nav class="nav" aria-label="メインナビゲーション">
+    <a class="active" aria-current="page" href="./index.html">Dashboard</a><a href="./pages/results.html">Results</a><a href="./pages/stats.html">Analysis</a><a href="./pages/practice.html">Practice</a><a href="./pages/coaching.html">Coaching</a><span class="nav-separator" aria-hidden="true"></span><a href="./pages/tools.html">Tools</a><a href="./pages/settings.html">Settings</a>
+  </nav>
+</header>
+<main class="container">
+  <section class="page-head">
+    <div><p class="eyebrow">improvement loop</p><h1>Dashboard</h1><p class="lead">最新のプレイを同期し、変化を見て、次のPracticeへつなげる。詳細な分析は必要な画面だけで確認します。</p></div>
+    <div class="actions"><a class="button primary" href="./pages/account.html">最新データを同期</a><a class="button ghost" href="./pages/results.html">Resultsを見る</a></div>
+  </section>
+  <section class="panel flat dashboard-sync-panel">
+    <div class="panel-title"><div><p class="eyebrow">sync status</p><h2>osu! Account</h2></div><a href="./pages/account.html">同期設定を開く →</a></div>
+    <div id="dashboardSyncStatus" class="notice" role="status">保存済み同期情報を確認しています。</div>
+  </section>
+  <section class="metric-grid" aria-label="Dashboard概要">
+    <article class="metric"><span>Results</span><strong id="dashboardResultCount">0</strong><small>保存済み</small></article>
+    <article class="metric"><span>Average ACC</span><strong id="dashboardAvgAcc">--</strong><small>保存済みResults</small></article>
+    <article class="metric"><span>Active Practice</span><strong id="dashboardActivePractice">0</strong><small>進行中</small></article>
+    <article class="metric"><span>Last Sync</span><strong id="dashboardLastSync">--</strong><small>最終同期日</small></article>
+  </section>
+  <div class="dashboard-grid">
+    <section class="stack">
+      <section class="panel flat"><div class="panel-title"><div><p class="eyebrow">recent change</p><h2>最近の変化</h2></div><a href="./pages/stats.html">Analysisへ →</a></div><div id="dashboardChange" class="list-empty">比較できるResultを確認しています。</div></section>
+      <section class="panel flat"><div class="panel-title"><div><p class="eyebrow">important trend</p><h2>次に見る傾向</h2></div></div><div id="dashboardTrend" class="list-empty">分析に必要なデータを確認しています。</div></section>
+      <section class="panel flat"><div class="panel-title"><div><p class="eyebrow">recent results</p><h2>最近のResults</h2></div><a href="./pages/results.html">すべて見る →</a></div><div id="dashboardRecent" class="list-empty">まだResultがありません。</div></section>
     </section>
-
-    <section class="metric-grid" aria-label="保存データ概要">
-      <article class="metric"><span>Results</span><strong id="homeResultCount">0</strong><small>保存済みリザルト</small></article>
-      <article class="metric"><span>Coaching</span><strong id="homeCoachingCount">0</strong><small>AI分析履歴</small></article>
-      <article class="metric"><span>Practice</span><strong id="homePracticeCount">0</strong><small>練習メニュー</small></article>
-      <article class="metric"><span>Average ACC</span><strong id="homeAverageAcc">--</strong><small>登録リザルト平均</small></article>
-    </section>
-
-    <section class="section-head">
-      <div><p class="eyebrow">workspace</p><h2>次にやることから開く</h2></div>
-      <p>同期・分析・練習・環境設定を役割ごとに分け、必要な画面へ最短で移動できます。</p>
-    </section>
-
-    <section class="feature-grid">
-      <a class="feature-card featured" href="./pages/account.html">
-        <span class="badge" data-account-sync-badge>SETUP REQUIRED</span>
-        <h3>Account Sync</h3>
-        <p>Supabase Edge Function経由でRecent PlaysとBest Scoresを取得し、同じScore IDを重複させずResultsへ蓄積します。</p>
-        <span class="card-link" data-account-sync-cta>設定する →</span>
-      </a>
-      <a class="feature-card featured" href="./pages/coaching.html"><span class="badge">CORE</span><h3>AI Coaching</h3><p>複数のリザルト画像とメモをまとめてChatGPTへ渡し、分析結果をSchema検証して履歴へ残します。</p><span class="card-link">分析を準備 →</span></a>
-      <a class="feature-card" href="./pages/results.html"><h3>Results</h3><p>API同期・手入力の両方を1つの履歴へまとめ、ACC・Miss・PP・★・BPM・MODを比較します。</p><span class="card-link">リザルトを見る →</span></a>
-      <a class="feature-card" href="./pages/stats.html"><h3>Stats</h3><p>保存済みリザルトから平均ACC、PP、Miss傾向などを軽量なグラフで確認します。</p><span class="card-link">傾向を見る →</span></a>
-      <a class="feature-card" href="./pages/practice.html"><h3>Practice</h3><p>今日の練習内容、目標、完了状況を管理して次のプレイへつなげます。</p><span class="card-link">練習を開く →</span></a>
-      <a class="feature-card" href="./pages/settings.html"><h3>Player Settings</h3><p>DPI、感度、タブレットArea、メモ、検証付きJSONバックアップをまとめて管理します。</p><span class="card-link">設定を見る →</span></a>
-      <a class="feature-card" href="./pages/tools.html"><h3>Desktop Tools</h3><p>音声出力、OpenTabletDriver、遅延対策、osu!lazerの起動準備をSetup Launcherでまとめます。</p><span class="card-link">Windowsツール →</span></a>
-    </section>
-
-    <section class="panel recent-panel">
-      <div class="panel-title"><div><p class="eyebrow">recent</p><h2>最近のリザルト</h2></div><a href="./pages/results.html">すべて見る →</a></div>
-      <div id="homeRecentResults" class="list-empty">まだリザルトがありません。Account SyncまたはResultsから追加できます。</div>
-    </section>
-  </main>
-
-  <footer class="footer"><span>osu! Hub <strong data-site-version></strong></span><span>Local-first data / secrets stay out of GitHub Pages.</span></footer>
-  <script src="./js/storage.js"></script>
-  <script src="./js/app.js"></script>
-  <script src="./js/site-meta.js"></script>
+    <aside class="stack">
+      <section class="panel flat"><div class="panel-title"><div><p class="eyebrow">practice</p><h2>最近のPractice</h2></div><a href="./pages/practice.html">Practiceへ →</a></div><div id="dashboardPractice" class="list-empty">Practiceはまだありません。</div></section>
+      <section class="panel flat"><p class="eyebrow">next actions</p><h2>改善ループ</h2><div class="next-actions"><a href="./pages/account.html"><span>1. 同期</span><span>→</span></a><a href="./pages/results.html"><span>2. Results確認</span><span>→</span></a><a href="./pages/stats.html"><span>3. Analysis</span><span>→</span></a><a href="./pages/practice.html"><span>4. Practice</span><span>→</span></a><a href="./pages/coaching.html"><span>必要ならCoaching</span><span>→</span></a></div></section>
+    </aside>
+  </div>
+</main>
+<footer class="footer"><span>osu! Hub <strong data-site-version></strong></span><span>Local-first improvement workspace.</span></footer>
+<script src="./js/storage.js"></script>
+<script src="./js/workspace.js"></script>
+<script src="./js/dashboard.js"></script>
+<script src="./js/site-meta.js"></script>
 </body>
 </html>

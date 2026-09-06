@@ -3,37 +3,41 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="osu!の練習メニュー、時間、カテゴリ、完了状況を軽量に管理するPractice画面。">
+  <meta name="description" content="osu!の分析結果からPracticeを作り、planned / active / completedとBefore / Afterを管理する画面。">
   <title>Practice | osu! Hub</title>
   <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="../css/workspace.css" data-workspace-styles>
 </head>
 <body data-page="practice">
-<header class="topbar">
-  <a class="brand" href="../index.html"><span class="brand-mark">osu!</span><span>Hub</span></a>
-  <nav class="nav" aria-label="メインナビゲーション">
-    <a href="./account.html">Account Sync</a><a href="./coaching.html">AI Coach</a><a href="./results.html">Results</a><a href="./practice.html">Practice</a><a href="./stats.html">Stats</a><a href="./settings.html">Settings</a><a href="./tools.html">Desktop Tools</a>
-  </nav>
-</header>
+<header class="topbar"><a class="brand" href="../index.html"><span class="brand-mark">osu!</span><span>Hub</span></a><nav class="nav" aria-label="メインナビゲーション"><a href="../index.html">Dashboard</a><a href="./results.html">Results</a><a href="./stats.html">Analysis</a><a class="active" aria-current="page" href="./practice.html">Practice</a><a href="./coaching.html">Coaching</a><span class="nav-separator" aria-hidden="true"></span><a href="./tools.html">Tools</a><a href="./settings.html">Settings</a></nav></header>
 <main class="container">
-<section class="page-head"><div><p class="eyebrow">training planner</p><h1>Practice</h1><p class="lead">練習内容を細かくしすぎず、今日何をやるかと完了したかだけを素早く管理。</p></div></section>
-<section class="metric-grid" aria-label="練習概要"><article class="metric"><span>Practice</span><strong id="practiceCount">0</strong><small>登録メニュー</small></article><article class="metric"><span>Done</span><strong id="practiceDone">0</strong><small>完了数</small></article><article class="metric"><span>Focus</span><strong>Aim</strong><small>カテゴリは自由に変更</small></article><article class="metric"><span>Storage</span><strong>Local</strong><small>IndexedDB</small></article></section>
+<section class="page-head"><div><p class="eyebrow">improvement cycle</p><h1>Practice</h1><p class="lead">苦手・目標・やることを1つの練習サイクルとして残し、練習前後のResultsを比較して次の判断へつなげます。</p></div><a class="button ghost" href="./stats.html">Analysisから探す</a></section>
+<section class="metric-grid" aria-label="Practice概要"><article class="metric"><span>Practice</span><strong id="practiceCount">0</strong><small>登録総数</small></article><article class="metric"><span>Active</span><strong id="practiceActive">0</strong><small>進行中</small></article><article class="metric"><span>Completed</span><strong id="practiceCompleted">0</strong><small>完了済み</small></article><article class="metric"><span>Storage</span><strong>Local</strong><small>IndexedDB</small></article></section>
+<div id="analysisPrefillNotice" class="success hidden" role="status">Analysisの内容をフォームへ引き継ぎました。内容を確認してからPracticeを作成してください。</div>
 <div class="split">
   <section class="panel flat">
-    <p class="eyebrow">add practice</p><h2>練習を追加</h2>
+    <div class="panel-title"><div><p class="eyebrow">plan</p><h2>Practiceを作成</h2></div><button id="cancelPracticeEdit" class="button small ghost hidden" type="button">編集をやめる</button></div>
     <form id="practiceForm" class="form-grid">
-      <div class="field"><label for="practiceDate">日付</label><input id="practiceDate" name="date" type="date"></div>
-      <div class="field"><label for="practiceCategory">カテゴリ</label><select id="practiceCategory" name="category"><option>Aim</option><option>Accuracy</option><option>Stream</option><option>Burst</option><option>Speed</option><option>Reading</option><option>Finger Control</option><option>Warmup</option><option>Free Play</option></select></div>
-      <div class="field full"><label for="practiceTitle">内容</label><input id="practiceTitle" name="title" required placeholder="例: 200〜220 BPMのAimを丁寧に"></div>
-      <div class="field"><label for="practiceMinutes">時間</label><input id="practiceMinutes" name="minutes" type="number" min="1" max="600" step="1" value="15"></div>
-      <div class="field"><label for="practiceNote">メモ</label><input id="practiceNote" name="note" placeholder="意識すること"></div>
-      <div class="field full"><div class="actions"><button class="button primary" type="submit">追加</button></div></div>
+      <input id="practiceId" type="hidden" name="id">
+      <div class="field full"><label for="practiceTheme">練習テーマ</label><input id="practiceTheme" name="theme" required placeholder="例: 6★前半のAccuracy安定"></div>
+      <div class="field full"><label for="practiceIssue">苦手 / 原因</label><textarea id="practiceIssue" name="issue" placeholder="例: 難易度が上がるとMissより先にAccuracyが崩れる"></textarea></div>
+      <div class="field full"><label for="practiceGoal">目標</label><input id="practiceGoal" name="goal" placeholder="例: 同難易度帯で平均ACC 97%以上"></div>
+      <div class="field full"><label for="practiceAction">やること</label><textarea id="practiceAction" name="action" required placeholder="例: 15分間、精度優先で6.0〜6.3★をプレイし、MissよりAim後の微調整を意識"></textarea></div>
+      <div class="field"><label for="practiceStartDate">開始日</label><input id="practiceStartDate" name="startDate" type="date"></div>
+      <div class="field"><label for="practiceDays">期間（日）</label><input id="practiceDays" name="durationDays" type="number" min="1" max="365" step="1" value="7"></div>
+      <div class="field"><label for="practiceMinutes">1回の目安（分）</label><input id="practiceMinutes" name="minutes" type="number" min="1" max="600" step="1" value="15"></div>
+      <div class="field full"><div class="actions"><button id="practiceSubmit" class="button primary" type="submit">Practiceを作成</button></div></div>
     </form>
   </section>
-  <aside class="panel flat"><p class="eyebrow">recommended flow</p><h2>使い方</h2><div class="callout"><strong>短く区切る</strong><p>Warmup → 苦手練習 → 実戦 → Free Playのように、目的を分ける。</p></div><p class="muted">将来はAIコーチングのrecommendedPracticeをこのページへ直接取り込めるようにする。</p></aside>
+  <aside class="stack">
+    <section class="panel flat"><p class="eyebrow">lifecycle</p><h2>planned → active → completed</h2><p class="muted">作成時に開始日前までの直近ResultsをBeforeとして保存します。完了時は開始日以降のResultsからAfterを作り、振り返りと一緒に残します。</p></section>
+    <section class="panel flat"><p class="eyebrow">evidence</p><h2>結果で確認する</h2><p class="muted">PracticeはTask管理ではなく、Analysisで見つけた問題を試し、再同期後に変化を確認するための記録です。</p><div class="actions"><a class="button ghost" href="./results.html">Resultsを見る</a><a class="button ghost" href="./account.html">再同期する</a></div></section>
+  </aside>
 </div>
-<section class="panel"><div class="panel-title"><div><p class="eyebrow">queue</p><h2>練習メニュー</h2></div></div><div id="practiceList" class="list-empty">練習メニューはまだありません。左のフォームから追加できます。</div></section>
+<section class="panel"><div class="panel-title"><div><p class="eyebrow">cycles</p><h2>Practice一覧</h2></div></div><div id="practiceList" class="list-empty">Practiceはまだありません。Analysisから作るか、フォームで追加できます。</div></section>
 </main>
-<footer class="footer"><span>osu! Hub <strong data-site-version></strong></span><span>継続しやすさ優先の軽量管理。</span></footer>
-<script src="../js/storage.js"></script><script src="../js/app.js"></script><script src="../js/site-meta.js"></script>
+<dialog id="practiceReviewDialog" class="app-dialog"><div class="dialog-body"><div class="dialog-head"><div><p class="eyebrow">complete practice</p><h2>完了・振り返り</h2></div><button id="cancelPracticeReview" class="button small ghost" type="button">閉じる</button></div><input id="completePracticeId" type="hidden"><div id="completePracticeSummary" class="notice"></div><div class="field" style="margin-top:16px"><label for="practiceReviewText">振り返り</label><textarea id="practiceReviewText" placeholder="何が改善したか、まだ崩れる条件、次に試すこと"></textarea></div><div class="actions"><button id="savePracticeReview" class="button primary" type="button">Before / Afterと振り返りを保存</button></div></div></dialog>
+<footer class="footer"><span>osu! Hub <strong data-site-version></strong></span><span>PracticeはResults / AnalysisとつながるLocal-first記録です。</span></footer>
+<script src="../js/storage.js"></script><script src="../js/workspace.js"></script><script src="../js/practice-mvp.js"></script><script src="../js/site-meta.js"></script>
 </body>
 </html>

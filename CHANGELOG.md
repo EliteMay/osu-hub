@@ -2,6 +2,48 @@
 
 Web Versionの正本は `data/site.json` の `siteVersion` です。Desktop Launcher Versionの正本は `package.json` の `version` です。
 
+## Web 0.3.0 - 2026-09-07
+
+### Added
+
+- Dashboardを改善ループの入口として実装
+- Resultsへ検索 / Filter / Sort / Load More / 詳細 / 手動メモ編集を追加
+- Analysisへ成長推移 / 難易度別 / 安定性 / Session比較を追加
+- 45分以上のプレイ間隔を初期DefaultにしたSession自動推定を追加
+- Practiceへ `planned / active / completed` Lifecycleを追加
+- Practice作成時Before Snapshot、完了時After Snapshot / 振り返りを追加
+- AnalysisからPracticeへのContext引き継ぎを追加
+- AI Coaching提案をPracticeフォームで確認してから保存する導線を追加
+- IndexedDB `sessions` Storeを追加
+- Schema v1 Backup → v2 Migration Regression Testを追加
+
+### Changed
+
+- Primary Navigationを `Dashboard / Results / Analysis / Practice / Coaching / Tools / Settings` へ整理
+- Account SyncをPrimary Navigationから外しSecondary Surfaceへ変更
+- Web Versionを `0.3.0` へ更新
+- Web IndexedDB DB / Schema Versionを `2` へ更新
+- `project-meta.json` のGuide adoption metadataを `1.18.0` へ更新
+- `tests/validate-web.mjs` をCurrent Requirements / Schema v2 / MVP Contractへ更新
+- `Check web` で全Web JavaScript / Test syntaxとStorage Migration Testを確認するよう変更
+
+### Compatibility / Safety
+
+- Result ID `osu:<score id>` を維持
+- 手入力Resultsを同期で削除しないContractを維持
+- API Resultの手動メモを再同期で維持
+- Schema v1 BackupをImport可能なまま維持
+- 旧Practice Recordをv2 Lifecycle形式へnormalize
+- Import Recovery Snapshot / read-back verification / Rollbackを維持
+- Supabase Edge Function / Secret / Token Contract変更なし
+- Electron Launcher / Desktop Version `0.18.9` / One-click Update Contract変更なし
+
+### Verification
+
+- Pull Request `Check web` でJavaScript syntax / JSON / Web Contract / Storage Migration Regressionを確認する
+- 実Browser E2E / Visual / ResponsiveはPR Static Validationとは別に未確認として扱う
+- Windows Desktop固有機能は今回変更していない
+
 ## Web 0.2.14 - 2026-08-31
 
 ### Changed

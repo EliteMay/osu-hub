@@ -1,13 +1,15 @@
 (() => {
   const DB_NAME = 'osuHubDB';
-  const DB_VERSION = 1;
-  const SCHEMA_VERSION = 1;
-  const STORES = ['results', 'coaching', 'practice', 'settings'];
+  const DB_VERSION = 2;
+  const SCHEMA_VERSION = 2;
+  const STORES = ['results', 'sessions', 'coaching', 'practice', 'settings'];
   const MAX_RECORD_JSON_BYTES = 2_000_000;
+  const PRACTICE_STATUSES = new Set(['planned', 'active', 'completed']);
   let dbPromise;
 
   const isRecord = (value) => value && typeof value === 'object' && !Array.isArray(value);
   const cloneJson = (value) => JSON.parse(JSON.stringify(value));
+  const toText = (value, max = 4000) => String(value ?? '').trim().slice(0, max);
 
   function keyFor(storeName, row) {
     return storeName === 'settings' ? row.key : row.id;
@@ -19,9 +21,71 @@
     return Number.isFinite(parsed) && parsed >= min && parsed <= max;
   }
 
+  function normalizePracticeRecord(row) {
+    const value = cloneJson(row || {});
+    const status = PRACTICE_STATUSES.has(value.status)
+      ? value.status
+      : value.done ? 'completed' : 'planned';
+    const startDate = toText(value.startDate || value.date || new Date().toISOString().slice(0, 10), 32);
+    return {
+      ...value,
+      schemaVersion: 2,
+      status,
+      done: status === 'completed',
+      theme: toText(value.theme || value.category || value.title || 'Practice', 200),
+      issue: toText(value.issue || value.reason || value.note || '', 1200),
+      goal: toText(value.goal || '', 1200),
+      action: toText(value.action || value.title || '', 1600),
+      startDate,
+      date: value.date || startDate,
+      durationDays: Math.min(365, Math.max(1, Number(value.durationDays) || 7)),
+      minutes: Math.min(24 * 60, Math.max(0, Number(value.minutes) || 15)),
+      linkedAnalysis: isRecord(value.linkedAnalysis) ? value.linkedAnalysis : null,
+      before: isRecord(value.before) ? value.before : null,
+      after: isRecord(value.after) ? value.after : null,
+      review: toText(value.review || '', 4000),
+      updatedAt: value.updatedAt || value.createdAt || new Date().toISOString(),
+    };
+  }
+
+  function normalizeSessionRecord(row) {
+    const value = cloneJson(row || {});
+    const resultIds = Array.isArray(value.resultIds)
+      ? [...new Set(value.resultIds.map((id) => toText(id, 200)).filter(Boolean))].slice(0, 1000)
+      : [];
+    return {
+      ...value,
+      schemaVersion: 1,
+      source: value.source === 'manual' ? 'manual' : 'auto',
+      resultIds,
+      playCount: Math.max(0, Number(value.playCount) || resultIds.length),
+      averageAccuracy: value.averageAccuracy == null ? null : Number(value.averageAccuracy),
+      totalMiss: Math.max(0, Number(value.totalMiss) || 0),
+      averagePp: value.averagePp == null ? null : Number(value.averagePp),
+      selfReview: toText(value.selfReview || '', 4000),
+      memo: toText(value.memo || '', 4000),
+      updatedAt: value.updatedAt || new Date().toISOString(),
+    };
+  }
+
+  function normalizeCoachingRecord(row) {
+    const value = cloneJson(row || {});
+    return {
+      ...value,
+      schemaVersion: Number(value.schemaVersion) || 1,
+    };
+  }
+
+  function normalizeRow(storeName, row) {
+    if (storeName === 'practice') return normalizePracticeRecord(row);
+    if (storeName === 'sessions') return normalizeSessionRecord(row);
+    if (storeName === 'coaching') return normalizeCoachingRecord(row);
+    return cloneJson(row);
+  }
+
   function validateRow(storeName, row, index) {
     if (!isRecord(row)) throw new Error(`${storeName}[${index}] がObjectではありません。`);
-    const value = cloneJson(row);
+    const value = normalizeRow(storeName, row);
     const serialized = JSON.stringify(value);
     if (new Blob([serialized]).size > MAX_RECORD_JSON_BYTES) {
       throw new Error(`${storeName}[${index}] が大きすぎます。`);
@@ -39,6 +103,9 @@
       if (!finiteInRange(value.pp, 0, Number.MAX_SAFE_INTEGER)) throw new Error(`${storeName}[${index}] のPPが不正です。`);
       if (!finiteInRange(value.stars, 0, 100)) throw new Error(`${storeName}[${index}] のStar Ratingが不正です。`);
       if (!finiteInRange(value.bpm, 0, 5000)) throw new Error(`${storeName}[${index}] のBPMが不正です。`);
+      if (!finiteInRange(value.ar, 0, 20) || !finiteInRange(value.od, 0, 20) || !finiteInRange(value.cs, 0, 20)) {
+        throw new Error(`${storeName}[${index}] のBeatmap属性が不正です。`);
+      }
 
       if (value.source === 'osu-api') {
         const scoreId = String(value.osuScoreId ?? '').trim();
@@ -48,24 +115,42 @@
       }
     }
 
-    if (storeName === 'practice' && !finiteInRange(value.minutes, 0, 24 * 60)) {
-      throw new Error(`${storeName}[${index}] のminutesが不正です。`);
+    if (storeName === 'sessions') {
+      if (!Array.isArray(value.resultIds)) throw new Error(`${storeName}[${index}] のresultIdsが配列ではありません。`);
+      if (!finiteInRange(value.playCount, 0, 100000)) throw new Error(`${storeName}[${index}] のplayCountが不正です。`);
+      if (!finiteInRange(value.averageAccuracy, 0, 100)) throw new Error(`${storeName}[${index}] のaverageAccuracyが不正です。`);
+      if (!finiteInRange(value.totalMiss, 0, Number.MAX_SAFE_INTEGER)) throw new Error(`${storeName}[${index}] のtotalMissが不正です。`);
+      if (!finiteInRange(value.averagePp, 0, Number.MAX_SAFE_INTEGER)) throw new Error(`${storeName}[${index}] のaveragePpが不正です。`);
+    }
+
+    if (storeName === 'practice') {
+      if (!PRACTICE_STATUSES.has(value.status)) throw new Error(`${storeName}[${index}] のstatusが不正です。`);
+      if (!finiteInRange(value.minutes, 0, 24 * 60)) throw new Error(`${storeName}[${index}] のminutesが不正です。`);
+      if (!finiteInRange(value.durationDays, 1, 365)) throw new Error(`${storeName}[${index}] のdurationDaysが不正です。`);
     }
 
     return value;
   }
 
-  function validateImportPayload(payload) {
-    if (!isRecord(payload) || payload.schemaVersion !== SCHEMA_VERSION || !isRecord(payload.stores)) {
+  function migrateImportPayload(payload) {
+    if (!isRecord(payload) || !isRecord(payload.stores)) {
       throw new Error('対応していないバックアップ形式です。');
     }
+    const version = Number(payload.schemaVersion || 0);
+    if (![1, 2].includes(version)) throw new Error('対応していないバックアップSchemaです。');
+    const stores = cloneJson(payload.stores);
+    if (version === 1 && !Array.isArray(stores.sessions)) stores.sessions = [];
+    return { schemaVersion: SCHEMA_VERSION, stores };
+  }
 
-    const unexpectedStores = Object.keys(payload.stores).filter((name) => !STORES.includes(name));
+  function validateImportPayload(payload) {
+    const migrated = migrateImportPayload(payload);
+    const unexpectedStores = Object.keys(migrated.stores).filter((name) => !STORES.includes(name));
     if (unexpectedStores.length) throw new Error(`未対応Storeがあります: ${unexpectedStores.join(', ')}`);
 
     const prepared = {};
     for (const storeName of STORES) {
-      const rows = payload.stores[storeName] ?? [];
+      const rows = migrated.stores[storeName] ?? [];
       if (!Array.isArray(rows)) throw new Error(`${storeName} が配列ではありません。`);
       const seen = new Set();
       prepared[storeName] = rows.map((row, index) => {
@@ -91,14 +176,18 @@
           }
         });
       };
-      req.onsuccess = () => resolve(req.result);
+      req.onsuccess = () => {
+        const db = req.result;
+        db.onversionchange = () => db.close();
+        resolve(db);
+      };
       req.onerror = () => {
         dbPromise = undefined;
         reject(req.error || new Error('IndexedDBを開けませんでした。'));
       };
       req.onblocked = () => {
         dbPromise = undefined;
-        reject(new Error('IndexedDB更新が他のタブによりブロックされています。'));
+        reject(new Error('IndexedDB更新が他のタブによりブロックされています。別タブを閉じて再読み込みしてください。'));
       };
     });
     return dbPromise;
@@ -150,8 +239,10 @@
   }
 
   const put = (storeName, value) => writeTransaction([storeName], (transaction) => {
-    transaction.objectStore(storeName).put(value);
-    return value;
+    if (!STORES.includes(storeName)) throw new Error(`未対応Storeです: ${storeName}`);
+    const normalized = validateRow(storeName, value, 0);
+    transaction.objectStore(storeName).put(normalized);
+    return normalized;
   });
   const get = (storeName, key) => readRequest(storeName, (store) => store.get(key));
   const getAll = (storeName) => readRequest(storeName, (store) => store.getAll());
@@ -164,7 +255,10 @@
 
   async function exportAll() {
     const data = { schemaVersion: SCHEMA_VERSION, exportedAt: new Date().toISOString(), stores: {} };
-    for (const storeName of STORES) data.stores[storeName] = await getAll(storeName);
+    for (const storeName of STORES) {
+      const rows = await getAll(storeName);
+      data.stores[storeName] = rows.map((row) => normalizeRow(storeName, row));
+    }
     return data;
   }
 
@@ -194,7 +288,7 @@
       for (const storeName of STORES) {
         const store = transaction.objectStore(storeName);
         store.clear();
-        for (const row of stores[storeName] || []) store.put(cloneJson(row));
+        for (const row of stores[storeName] || []) store.put(normalizeRow(storeName, row));
       }
     });
   }
@@ -249,5 +343,6 @@
     exportAll,
     importAll,
     validateImportPayload,
+    normalizePracticeRecord,
   };
 })();
