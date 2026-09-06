@@ -255,7 +255,10 @@
 
   async function exportAll() {
     const data = { schemaVersion: SCHEMA_VERSION, exportedAt: new Date().toISOString(), stores: {} };
-    for (const storeName of STORES) data.stores[storeName] = await getAll(storeName);
+    for (const storeName of STORES) {
+      const rows = await getAll(storeName);
+      data.stores[storeName] = rows.map((row) => normalizeRow(storeName, row));
+    }
     return data;
   }
 
