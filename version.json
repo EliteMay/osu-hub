@@ -1,5 +1,5 @@
 {
-  "latestVersion": "0.18.9",
+  "latestVersion": "0.18.10",
   "downloadUrl": "https://github.com/EliteMay/osu-hub/releases/latest",
-  "releaseNotes": "v0.18.9では音声切替先の手入力を通常導線から外し、SVCLで検出した実際の再生デバイスを一覧から選べるようにする。表示は『スピーカー (High Definition Audio Device)』のような分かりやすい名前にし、内部では正確なEndpoint IDを保存する。詳細IDの手入力は上級者向けとして残す。"
+  "releaseNotes": "v0.18.10では、SVCLが未導入のとき再生デバイス一覧の初回取得時に自動でSVCLを取得し、そのまま一覧取得を再試行する。既にSVCLがある場合は再ダウンロードしないため、通常は『SVCLを自動取得』ボタンを押す必要がなくなる。手動取得ボタンは再取得用の保険として残す。"
 }
