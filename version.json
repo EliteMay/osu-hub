@@ -1,5 +1,5 @@
 {
-  "latestVersion": "0.18.10",
+  "latestVersion": "0.18.11",
   "downloadUrl": "https://github.com/EliteMay/osu-hub/releases/latest",
-  "releaseNotes": "v0.18.10では、SVCLが未導入のとき再生デバイス一覧の初回取得時に自動でSVCLを取得し、そのまま一覧取得を再試行する。既にSVCLがある場合は再ダウンロードしないため、通常は『SVCLを自動取得』ボタンを押す必要がなくなる。手動取得ボタンは再取得用の保険として残す。"
+  "releaseNotes": "v0.18.11では、osu Setup Launcher専用の黒×ピンク系アイコンを追加し、Windowsのアプリ本体・ウィンドウ・Setup.exe・アンインストーラー・デスクトップ/スタートメニューのショートカットで同じアイコンを使う設定にする。実行ファイルのリソース編集を止めていた設定も修正し、アイコンを正しく埋め込めるようにする。"
 }
