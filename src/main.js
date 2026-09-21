@@ -8,6 +8,7 @@ const { matchText, isSvclEndpointDevice, chooseSvclDevice } = require("./audio-m
 
 const APP_ROOT = path.join(__dirname, "..");
 const DEFAULT_CONFIG_PATH = path.join(APP_ROOT, "data", "config.json");
+const APP_ICON_PATH = path.join(APP_ROOT, "src", "assets", "app-icon.ico");
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const safeExists = (value) => {
@@ -82,6 +83,7 @@ function createWindow() {
     minWidth: 900,
     minHeight: 640,
     title: "osu Setup Launcher",
+    icon: APP_ICON_PATH,
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
