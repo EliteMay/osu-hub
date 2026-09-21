@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require("electron");
 const path = require("path");
+const APP_ICON_PATH = path.join(__dirname, "..", "assets", "osu-hub.ico");
 const fs = require("fs");
 const { spawn, exec } = require("child_process");
 const https = require("https");
@@ -83,6 +84,7 @@ function createWindow() {
     minHeight: 640,
     title: "osu Setup Launcher",
     autoHideMenuBar: true,
+    icon: APP_ICON_PATH,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -93,6 +95,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  if (process.platform === "win32") app.setAppUserModelId("local.osu.setup.launcher");
   ensureUserConfig();
   createWindow();
   app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

@@ -2,6 +2,34 @@
 
 Web Versionの正本は `data/site.json` の `siteVersion` です。Desktop Launcher Versionの正本は `package.json` の `version` です。
 
+## Web 0.3.2 - 2026-09-22
+
+### Changed
+
+- Desktop Toolsの配布表示をLauncher `v0.18.11` へ更新
+- Web Versionを `0.3.2` へ更新
+- v0.18.11の専用Windowsアイコン対応を案内
+
+## Desktop 0.18.11 - 2026-09-22
+
+### Changed
+
+- osu Setup Launcher専用のWindowsアプリアイコンを追加
+- アプリ本体 / タスクバー / デスクトップ・Start Menuショートカット / NSIS Setup.exe・Uninstallerで同じ `assets/osu-hub.ico` を使用
+- `BrowserWindow`へ同じアイコンを明示し、WindowsのAppUserModelIdを `local.osu.setup.launcher` に固定
+- `signAndEditExecutable: false` を解除し、コード署名なしのままEXE resource editingによるアイコン埋め込みを有効化
+
+### Regression Guard
+
+- `tests/validate-app-icon.mjs` を追加
+- ICO header / build files / win・NSIS icon設定 / BrowserWindow / AppUserModelId / Windows workflowをStatic Validation
+- `assets/**` 変更でもWindows installer workflowが起動するよう更新
+
+### Verification
+
+- Pull RequestでApp Icon validationとNSIS Windows buildを実行する
+- CI build成功だけではWindows ShellのIcon Cacheを含む実機表示確認済みとは扱わない
+
 ## Web 0.3.0 - 2026-09-07
 
 ### Added

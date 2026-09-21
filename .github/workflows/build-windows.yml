@@ -7,7 +7,9 @@ on:
       - ".github/workflows/build-windows.yml"
       - "package.json"
       - "src/**"
+      - "assets/**"
       - "tools/**"
+      - "tests/validate-app-icon.mjs"
       - "tests/validate-audio-interop.mjs"
       - "tests/validate-auto-update.mjs"
       - "data/config.json"
@@ -19,7 +21,9 @@ on:
       - ".github/workflows/build-windows.yml"
       - "package.json"
       - "src/**"
+      - "assets/**"
       - "tools/**"
+      - "tests/validate-app-icon.mjs"
       - "tests/validate-audio-interop.mjs"
       - "tests/validate-auto-update.mjs"
       - "data/config.json"
@@ -65,6 +69,9 @@ jobs:
 
       - name: Check auto-update regression guards
         run: node tests/validate-auto-update.mjs
+
+      - name: Check app icon regression guards
+        run: node tests/validate-app-icon.mjs
 
       - name: Check Windows audio fallback sources
         shell: powershell

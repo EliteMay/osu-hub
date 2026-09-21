@@ -269,6 +269,7 @@ https://github.com/EliteMay/osu-hub/releases/latest
 - REAL等の遅延対策アプリ起動
 - osu!lazer自動検出 / 起動
 - アプリ内One-click Update
+- 専用Windowsアプリアイコン（アプリ本体 / タスクバー / ショートカット / Setup.exe）
 
 ### 音声切替
 
@@ -373,6 +374,7 @@ PR:
 - `AudioSwitcher.cs` compile
 - FxSound matcher Self Test
 - Auto Update regression check
+- App Icon regression check
 - installer build
 - Setup.exe / `latest.yml` / `.blockmap` の存在・Version整合確認
 - Actions Artifact保存
@@ -444,6 +446,7 @@ Pages ArtifactはWebファイルだけを公開し、Electron source、bat、Sup
 - 同期済みResultsをAI Coachingへ直接選択する機能
 - v0.18.9 Audio Pickerが実Windowsで `スピーカー (High Definition Audio Device)` を表示・保存できること
 - v0.18.8 → v0.18.9の実Windows One-click Update / Restart確認
+- v0.18.11の専用アイコンが実Windowsのタスクバー / デスクトップ / Start Menu / Setup.exeへ反映されること
 - Auto Update後のuserData設定維持確認
 - Installer Code Signing
 - Root Electronの `package-lock.json` をdependency変更に合わせて生成・追跡する
