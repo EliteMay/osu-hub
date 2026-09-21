@@ -1,12 +1,15 @@
 {
-  "siteVersion": "0.3.1",
+  "siteVersion": "0.3.2",
   "name": "osu! Hub",
   "repository": "https://github.com/EliteMay/osu-hub",
   "pagesUrl": "https://elitemay.github.io/osu-hub/",
   "osuApi": {
     "provider": "Supabase Edge Functions",
     "endpointUrl": "https://vtnwbgejlaqpnwmlzbjy.supabase.co/functions/v1/osu-sync",
-    "scoreTypes": ["recent", "best"],
+    "scoreTypes": [
+      "recent",
+      "best"
+    ],
     "recentWindowHours": 24,
     "syncLimit": 100,
     "includeFails": true,
@@ -16,7 +19,7 @@
   },
   "launcher": {
     "name": "osu Setup Launcher",
-    "version": "0.18.10",
+    "version": "0.18.11",
     "releasesUrl": "https://github.com/EliteMay/osu-hub/releases",
     "latestReleaseUrl": "https://github.com/EliteMay/osu-hub/releases/latest"
   }
