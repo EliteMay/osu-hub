@@ -1,6 +1,6 @@
 {
   "name": "osu-setup-launcher",
-  "version": "0.18.10",
+  "version": "0.18.11",
   "description": "osu!lazer 用の一括セットアップ起動Electronアプリ",
   "main": "src/bootstrap.js",
   "scripts": {
@@ -44,17 +44,26 @@
       "作業報告書.md"
     ],
     "win": {
-      "target": [{"target":"nsis","arch":["x64"]}],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "artifactName": "osu_setup_${version}_setup.${ext}",
-      "signAndEditExecutable": false,
-      "forceCodeSigning": false
+      "forceCodeSigning": false,
+      "icon": "src/assets/app-icon.ico"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "osu Setup Launcher"
+      "shortcutName": "osu Setup Launcher",
+      "installerIcon": "src/assets/app-icon.ico",
+      "uninstallerIcon": "src/assets/app-icon.ico"
     },
     "artifactName": "osu_setup_${version}_setup.${ext}"
   },
